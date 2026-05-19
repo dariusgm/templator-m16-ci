@@ -246,4 +246,106 @@ mod tests {
         );
         assert!(dir.path().join("done.txt").exists());
     }
+
+    #[test]
+    fn test_replace_empty_patterns_is_noop() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("f.txt"), "unchanged content").unwrap();
+
+        processor(dir.path()).replace_in_file("f.txt", &[]).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "unchanged content"
+        );
+    }
+
+    #[test]
+    fn test_replace_patterns_applied_sequentially() {
+        // Second pattern acts on the output of the first, not on the original text.
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("f.txt"), "foo").unwrap();
+
+        processor(dir.path())
+            .replace_in_file(
+                "f.txt",
+                &[
+                    ReplacePattern {
+                        from: "foo".into(),
+                        to: "bar".into(),
+                    },
+                    ReplacePattern {
+                        from: "bar".into(),
+                        to: "baz".into(),
+                    },
+                ],
+            )
+            .unwrap();
+
+        assert_eq!(fs::read_to_string(dir.path().join("f.txt")).unwrap(), "baz");
+    }
+
+    #[test]
+    fn test_replace_in_nested_subdirectory() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("sub/dir")).unwrap();
+        fs::write(dir.path().join("sub/dir/file.txt"), "__PLACEHOLDER__").unwrap();
+
+        processor(dir.path())
+            .replace_in_file(
+                "sub/dir/file.txt",
+                &[ReplacePattern {
+                    from: "__PLACEHOLDER__".into(),
+                    to: "value".into(),
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(dir.path().join("sub/dir/file.txt")).unwrap(),
+            "value"
+        );
+    }
+
+    #[test]
+    fn test_run_command_error_message_includes_command() {
+        let dir = tempdir().unwrap();
+        let result = processor(dir.path()).run_command("exit 42");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("exit 42"),
+            "error message should include the failing command, got: {msg}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_replace_rejects_symlink_escaping_working_dir() {
+        use std::os::unix::fs::symlink;
+
+        let working_dir = tempdir().unwrap();
+        let external_dir = tempdir().unwrap();
+
+        let external_file = external_dir.path().join("secret.txt");
+        fs::write(&external_file, "secret content").unwrap();
+
+        // Symlink inside working_dir pointing to a file outside it
+        symlink(&external_file, working_dir.path().join("link.txt")).unwrap();
+
+        let result = processor(working_dir.path()).replace_in_file(
+            "link.txt",
+            &[ReplacePattern {
+                from: "secret".into(),
+                to: "replaced".into(),
+            }],
+        );
+
+        assert!(result.is_err(), "Symlink escape should be rejected");
+        // External file must not have been modified
+        assert_eq!(
+            fs::read_to_string(&external_file).unwrap(),
+            "secret content"
+        );
+    }
 }

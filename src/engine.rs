@@ -111,14 +111,20 @@ pub fn has_template_suffix(path: &Path) -> bool {
     path.extension().is_some_and(|ext| ext == "template")
 }
 
-/// Strips `.template` from the end of a path.
-/// `foo.py.template` → `foo.py`, `foo.template` → `foo`, others unchanged.
+/// Strips `.template` from every component of a path.
+/// `foo.py.template` → `foo.py`, `assets.template/logo.png` → `assets/logo.png`.
 pub fn strip_template_suffix(path: &Path) -> PathBuf {
-    if has_template_suffix(path) {
-        path.with_extension("")
-    } else {
-        path.to_path_buf()
+    let mut result = PathBuf::new();
+    for component in path.components() {
+        let s = component.as_os_str();
+        let p = Path::new(s);
+        if has_template_suffix(p) {
+            result.push(p.with_extension(""));
+        } else {
+            result.push(s);
+        }
     }
+    result
 }
 
 /// Replaces `__key__` placeholders in every path component with the matching variable value.
@@ -201,6 +207,19 @@ mod tests {
         assert_eq!(
             strip_template_suffix(Path::new("main.py")),
             PathBuf::from("main.py")
+        );
+    }
+
+    #[test]
+    fn test_strip_intermediate_directory_component() {
+        // The .template suffix is stripped from every component, not just the last filename.
+        assert_eq!(
+            strip_template_suffix(Path::new("assets.template/logo.png")),
+            PathBuf::from("assets/logo.png")
+        );
+        assert_eq!(
+            strip_template_suffix(Path::new("src/views.template/index.html.template")),
+            PathBuf::from("src/views/index.html")
         );
     }
 
@@ -401,6 +420,136 @@ mod tests {
 
         let expected = output_dir.path().join("src/myorg/myapp/main.py");
         assert!(expected.exists(), "Subdirectory via variable failed");
+    }
+
+    // --- substitute_path: multiple vars in one component ---
+
+    #[test]
+    fn test_substitute_path_multiple_vars_in_one_component() {
+        let vars = HashMap::from([
+            ("org".to_string(), "acme".to_string()),
+            ("project".to_string(), "widget".to_string()),
+        ]);
+        assert_eq!(
+            substitute_path(Path::new("__org__-__project__"), &vars),
+            PathBuf::from("acme-widget")
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_empty_string_value() {
+        let vars = HashMap::from([("prefix".to_string(), "".to_string())]);
+        assert_eq!(
+            substitute_path(Path::new("__prefix__main.py"), &vars),
+            PathBuf::from("main.py")
+        );
+    }
+
+    // --- generate: Tera syntax error returns error ---
+
+    #[test]
+    fn test_generate_tera_syntax_error_returns_error() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        fs::write(
+            template_dir.path().join("broken.txt.template"),
+            "{{ unclosed",
+        )
+        .unwrap();
+
+        let config = make_config(&[]);
+        let result =
+            TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config);
+        assert!(result.is_err(), "Invalid Tera syntax should return error");
+    }
+
+    // --- generate: empty template directory ---
+
+    #[test]
+    fn test_generate_empty_template_dir_succeeds() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        let config = make_config(&[]);
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        let entries: Vec<_> = fs::read_dir(output_dir.path()).unwrap().collect();
+        assert!(
+            entries.is_empty(),
+            "Output should be empty for empty template"
+        );
+    }
+
+    // --- generate: .git directories are skipped ---
+
+    #[test]
+    fn test_generate_skips_dot_git_directory() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        let git_dir = template_dir.path().join(".git");
+        fs::create_dir_all(&git_dir).unwrap();
+        fs::write(git_dir.join("config"), "[core]\nbare = false").unwrap();
+        fs::write(template_dir.path().join("README.md"), "hello").unwrap();
+
+        let config = make_config(&[]);
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert!(output_dir.path().join("README.md").exists());
+        assert!(
+            !output_dir.path().join(".git").exists(),
+            ".git dir should not appear in output"
+        );
+    }
+
+    // --- generate: variable overrides config.name in Tera context ---
+
+    #[test]
+    fn test_generate_variable_overrides_config_name() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        fs::write(template_dir.path().join("out.txt.template"), "{{ name }}").unwrap();
+
+        // config.name = "test" (from make_config), variables["name"] = "overridden"
+        let config = make_config(&[("name", "overridden")]);
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(output_dir.path().join("out.txt")).unwrap(),
+            "overridden"
+        );
+    }
+
+    // --- generate: directory with .template suffix is renamed ---
+
+    #[test]
+    fn test_generate_directory_with_template_suffix_is_renamed() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        let subdir = template_dir.path().join("assets.template");
+        fs::create_dir_all(&subdir).unwrap();
+        fs::write(subdir.join("logo.png"), "binary").unwrap();
+
+        let config = make_config(&[]);
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert!(
+            output_dir.path().join("assets").is_dir(),
+            "assets.template dir should become assets/"
+        );
+        assert!(output_dir.path().join("assets/logo.png").exists());
+        assert!(!output_dir.path().join("assets.template").exists());
     }
 
     // --- generate: tera default filter works ---

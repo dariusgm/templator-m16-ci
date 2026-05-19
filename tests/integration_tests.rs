@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use templator::{Config, PostProcessor, TemplateEngine};
+use templator::{config::PostProcessStep, Config, PostProcessor, TemplateEngine};
 use walkdir::WalkDir;
 
 fn basic_template_dir() -> PathBuf {
@@ -156,6 +157,83 @@ fn test_path_substitution_creates_correct_structure() -> anyhow::Result<()> {
 
     // The __project_name__ directory should NOT exist in output
     assert!(!out.path().join("src/__project_name__").exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_tera_syntax_error_returns_error() {
+    let template_dir = tempfile::tempdir().unwrap();
+    let output_dir = tempfile::tempdir().unwrap();
+
+    fs::write(
+        template_dir.path().join("broken.txt.template"),
+        "{{ unclosed",
+    )
+    .unwrap();
+
+    let config = Config {
+        name: "test".into(),
+        description: None,
+        variables: HashMap::new(),
+        post_processing: vec![],
+    };
+
+    let result = TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config);
+    assert!(
+        result.is_err(),
+        "Invalid Tera syntax should propagate as error"
+    );
+}
+
+#[test]
+fn test_run_command_failure_aborts_post_processing() -> anyhow::Result<()> {
+    let config = Config::from_file(&basic_config_file())?;
+    let out = tempfile::tempdir()?;
+
+    TemplateEngine::new().generate(&basic_template_dir(), out.path(), &config)?;
+
+    let steps = vec![PostProcessStep::RunCommand {
+        command: "exit 1".into(),
+    }];
+    let result = PostProcessor::new(out.path().to_path_buf()).execute(&steps);
+    assert!(
+        result.is_err(),
+        "run_command failure should abort post-processing"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_multiple_path_substitutions_end_to_end() -> anyhow::Result<()> {
+    let template_dir = tempfile::tempdir()?;
+    let output_dir = tempfile::tempdir()?;
+
+    // Two __var__ placeholders in the same path
+    let src = template_dir
+        .path()
+        .join("src")
+        .join("__org__")
+        .join("__project__");
+    fs::create_dir_all(&src)?;
+    fs::write(src.join("main.py.template"), "# {{ org }}.{{ project }}")?;
+
+    let config = Config {
+        name: "test".into(),
+        description: None,
+        variables: HashMap::from([
+            ("org".into(), "acme".into()),
+            ("project".into(), "widget".into()),
+        ]),
+        post_processing: vec![],
+    };
+
+    TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config)?;
+
+    let out_file = output_dir.path().join("src/acme/widget/main.py");
+    assert!(out_file.exists(), "nested path substitution failed");
+    assert_eq!(fs::read_to_string(out_file)?, "# acme.widget");
 
     Ok(())
 }

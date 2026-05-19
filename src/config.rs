@@ -119,4 +119,27 @@ mod tests {
         let result = Config::from_file(Path::new("/nonexistent/config.json"));
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_from_file_invalid_json_error_message() {
+        let mut f = NamedTempFile::new().unwrap();
+        write!(f, "{{ not valid json {{{{").unwrap();
+        let err = Config::from_file(f.path()).unwrap_err();
+        assert!(
+            err.to_string().contains("Invalid config JSON"),
+            "expected 'Invalid config JSON' in error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_null_name_errors() {
+        let json = r#"{"name": null, "variables": {}}"#;
+        assert!(serde_json::from_str::<Config>(json).is_err());
+    }
+
+    #[test]
+    fn test_parse_unknown_post_process_type_errors() {
+        let json = r#"{"name":"t","variables":{},"post_processing":[{"type":"unknown_step"}]}"#;
+        assert!(serde_json::from_str::<Config>(json).is_err());
+    }
 }
