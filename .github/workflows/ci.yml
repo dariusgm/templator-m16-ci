@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Tests run once on Linux only — no need to repeat them per platform.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Tests
+        run: cargo test --verbose
+
+      - name: Security audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Release builds for all major targets. Only runs when test passes.
+  build:
+    name: Build (${{ matrix.target }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 — target x86-64-v3 (AVX2 + BMI2 + FMA, Haswell/Excavator and later)
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary: templator
+            archive_ext: tar.gz
+            rustflags: "-C target-cpu=x86-64-v3"
+
+          # Linux ARM64 — Neoverse-N1 covers AWS Graviton2 and comparable modern ARM servers
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary: templator
+            archive_ext: tar.gz
+            rustflags: "-C target-cpu=neoverse-n1"
+            use_cross: true
+
+          # macOS Intel — macos-13 is the last Intel-native GitHub runner
+          - target: x86_64-apple-darwin
+            os: macos-13
+            binary: templator
+            archive_ext: tar.gz
+            rustflags: "-C target-cpu=x86-64-v3"
+
+          # macOS Apple Silicon — macos-latest (14+) runs on M1 hardware
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary: templator
+            archive_ext: tar.gz
+            rustflags: "-C target-cpu=apple-m1"
+
+          # Windows x86_64 — same modern x86_64 baseline as Linux
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary: templator.exe
+            archive_ext: zip
+            rustflags: "-C target-cpu=x86-64-v3"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use_cross == true
+        run: cargo install cross --locked
+
+      - name: Build (cross)
+        if: matrix.use_cross == true
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build (cargo)
+        if: matrix.use_cross != true
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        run: |
+          archive="templator-${{ matrix.target }}.tar.gz"
+          tar -czf "$archive" -C "target/${{ matrix.target }}/release" "${{ matrix.binary }}"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Package (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          $archive = "templator-${{ matrix.target }}.zip"
+          Compress-Archive `
+            -Path "target/${{ matrix.target }}/release/${{ matrix.binary }}" `
+            -DestinationPath $archive
+          "ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: templator-${{ matrix.target }}
+          path: ${{ env.ARCHIVE }}
+          retention-days: 30

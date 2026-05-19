@@ -1,0 +1,29 @@
+[package]
+name = "templator"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "templator"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tera = "1.20"
+clap = { version = "4.5", features = ["derive"] }
+walkdir = "2.4"
+anyhow = "1.0"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+tempfile = "3.10"
+
+[profile.release]
+opt-level = 3        # maximum speed optimisation
+lto = "fat"          # whole-program LTO across all crates
+codegen-units = 1    # single unit — lets the optimiser see everything
+panic = "abort"      # no unwinding machinery, smaller + faster
+strip = "symbols"    # drop symbol table from the final binary

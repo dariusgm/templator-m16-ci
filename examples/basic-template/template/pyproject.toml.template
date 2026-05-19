@@ -1,0 +1,13 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = "{{ description | default(value="") }}"
+authors = [{ name = "__AUTHOR__" }]
+requires-python = ">={{ python_version }}"
+
+[tool.ruff]
+target-version = "{{ python_version_short }}"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
