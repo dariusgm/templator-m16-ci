@@ -172,7 +172,7 @@ mod tests {
     fn test_no_template_suffix_not_detected() {
         assert!(!has_template_suffix(Path::new(".gitignore")));
         assert!(!has_template_suffix(Path::new("main.py")));
-        assert!(!has_template_suffix(Path::new("config.json")));
+        assert!(!has_template_suffix(Path::new("templator.json")));
         assert!(!has_template_suffix(Path::new("Makefile")));
     }
 

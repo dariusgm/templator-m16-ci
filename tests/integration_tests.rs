@@ -9,7 +9,7 @@ fn basic_template_dir() -> PathBuf {
 }
 
 fn basic_config_file() -> PathBuf {
-    PathBuf::from("examples/basic-template/config.json")
+    PathBuf::from("examples/basic-template/templator.json")
 }
 
 #[test]

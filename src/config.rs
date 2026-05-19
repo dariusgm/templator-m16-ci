@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_from_file_not_found() {
-        let result = Config::from_file(Path::new("/nonexistent/config.json"));
+        let result = Config::from_file(Path::new("/nonexistent/templator.json"));
         assert!(result.is_err());
     }
 
