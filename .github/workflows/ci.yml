@@ -61,20 +61,6 @@ jobs:
             rustflags: "-C target-cpu=neoverse-n1"
             use_cross: true
 
-          # macOS Intel — macos-13 is the last Intel-native GitHub runner
-          - target: x86_64-apple-darwin
-            os: macos-13
-            binary: templator
-            archive_ext: tar.gz
-            rustflags: "-C target-cpu=x86-64-v3"
-
-          # macOS Apple Silicon — macos-latest (14+) runs on M1 hardware
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            binary: templator
-            archive_ext: tar.gz
-            rustflags: "-C target-cpu=apple-m1"
-
           # Windows x86_64 — same modern x86_64 baseline as Linux
           - target: x86_64-pc-windows-msvc
             os: windows-latest
