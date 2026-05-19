@@ -6,16 +6,13 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   # Tests run once on Linux only — no need to repeat them per platform.
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -32,10 +29,13 @@ jobs:
       - name: Tests
         run: cargo test --verbose
 
+      # rustsec/audit-check has no node24 release; run cargo-audit directly instead.
+      # rust-cache caches ~/.cargo/bin, so the install is only slow on the first run.
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
       - name: Security audit
-        uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo audit
 
   # Release builds for all major targets. Only runs when test passes.
   build:
@@ -83,7 +83,7 @@ jobs:
             rustflags: "-C target-cpu=x86-64-v3"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -127,7 +127,7 @@ jobs:
           "ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: templator-${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
