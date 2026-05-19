@@ -36,9 +36,7 @@ impl PostProcessor {
     fn replace_in_file(&self, file: &str, patterns: &[ReplacePattern]) -> anyhow::Result<()> {
         // Reject absolute paths and path traversal before any filesystem operation
         let file_path = Path::new(file);
-        if file_path.is_absolute()
-            || file_path.components().any(|c| c == Component::ParentDir)
-        {
+        if file_path.is_absolute() || file_path.components().any(|c| c == Component::ParentDir) {
             anyhow::bail!(
                 "replace path '{}' must be relative and non-traversing",
                 file
@@ -100,10 +98,19 @@ mod tests {
         fs::write(dir.path().join("file.txt"), "Hello __NAME__!").unwrap();
 
         processor(dir.path())
-            .replace_in_file("file.txt", &[ReplacePattern { from: "__NAME__".into(), to: "Alice".into() }])
+            .replace_in_file(
+                "file.txt",
+                &[ReplacePattern {
+                    from: "__NAME__".into(),
+                    to: "Alice".into(),
+                }],
+            )
             .unwrap();
 
-        assert_eq!(fs::read_to_string(dir.path().join("file.txt")).unwrap(), "Hello Alice!");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("file.txt")).unwrap(),
+            "Hello Alice!"
+        );
     }
 
     #[test]
@@ -115,13 +122,22 @@ mod tests {
             .replace_in_file(
                 "f.txt",
                 &[
-                    ReplacePattern { from: "__A__".into(), to: "foo".into() },
-                    ReplacePattern { from: "__B__".into(), to: "bar".into() },
+                    ReplacePattern {
+                        from: "__A__".into(),
+                        to: "foo".into(),
+                    },
+                    ReplacePattern {
+                        from: "__B__".into(),
+                        to: "bar".into(),
+                    },
                 ],
             )
             .unwrap();
 
-        assert_eq!(fs::read_to_string(dir.path().join("f.txt")).unwrap(), "foo + bar");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "foo + bar"
+        );
     }
 
     #[test]
@@ -130,10 +146,19 @@ mod tests {
         fs::write(dir.path().join("f.txt"), "__X__ __X__ __X__").unwrap();
 
         processor(dir.path())
-            .replace_in_file("f.txt", &[ReplacePattern { from: "__X__".into(), to: "y".into() }])
+            .replace_in_file(
+                "f.txt",
+                &[ReplacePattern {
+                    from: "__X__".into(),
+                    to: "y".into(),
+                }],
+            )
             .unwrap();
 
-        assert_eq!(fs::read_to_string(dir.path().join("f.txt")).unwrap(), "y y y");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "y y y"
+        );
     }
 
     #[test]
@@ -180,7 +205,9 @@ mod tests {
     #[test]
     fn test_run_command_creates_file() {
         let dir = tempdir().unwrap();
-        processor(dir.path()).run_command("touch created.txt").unwrap();
+        processor(dir.path())
+            .run_command("touch created.txt")
+            .unwrap();
         assert!(dir.path().join("created.txt").exists());
     }
 
@@ -201,14 +228,22 @@ mod tests {
         let steps = vec![
             PostProcessStep::Replace {
                 file: "a.txt".into(),
-                patterns: vec![ReplacePattern { from: "__FOO__".into(), to: "replaced".into() }],
+                patterns: vec![ReplacePattern {
+                    from: "__FOO__".into(),
+                    to: "replaced".into(),
+                }],
             },
-            PostProcessStep::RunCommand { command: "touch done.txt".into() },
+            PostProcessStep::RunCommand {
+                command: "touch done.txt".into(),
+            },
         ];
 
         processor(dir.path()).execute(&steps).unwrap();
 
-        assert_eq!(fs::read_to_string(dir.path().join("a.txt")).unwrap(), "replaced");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+            "replaced"
+        );
         assert!(dir.path().join("done.txt").exists());
     }
 }

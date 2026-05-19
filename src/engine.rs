@@ -59,7 +59,10 @@ impl TemplateEngine {
 
             // Reject variable values that would escape the output directory
             if substituted.components().any(|c| {
-                matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+                matches!(
+                    c,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
             }) {
                 anyhow::bail!(
                     "Unsafe path after variable substitution: '{}' — variable values must not contain '..' or absolute paths",
@@ -375,7 +378,10 @@ mod tests {
         let config = make_config(&[("unsafe", "../../escaped")]);
         let result =
             TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config);
-        assert!(result.is_err(), "Expected error for path traversal via variable");
+        assert!(
+            result.is_err(),
+            "Expected error for path traversal via variable"
+        );
     }
 
     #[test]

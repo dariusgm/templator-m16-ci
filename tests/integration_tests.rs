@@ -19,8 +19,14 @@ fn test_basic_generation_files_exist() -> anyhow::Result<()> {
     TemplateEngine::new().generate(&basic_template_dir(), out.path(), &config)?;
 
     // Template files rendered without .template suffix
-    assert!(out.path().join("pyproject.toml").exists(), "pyproject.toml missing");
-    assert!(out.path().join("src/my_project/main.py").exists(), "main.py missing");
+    assert!(
+        out.path().join("pyproject.toml").exists(),
+        "pyproject.toml missing"
+    );
+    assert!(
+        out.path().join("src/my_project/main.py").exists(),
+        "main.py missing"
+    );
 
     // Non-template file copied as-is
     assert!(out.path().join(".gitignore").exists(), ".gitignore missing");
@@ -38,7 +44,8 @@ fn test_no_template_files_in_output() -> anyhow::Result<()> {
     for entry in WalkDir::new(out.path()).into_iter().filter_map(|e| e.ok()) {
         let ext = entry.path().extension().unwrap_or_default();
         assert_ne!(
-            ext, "template",
+            ext,
+            "template",
             "Unexpected .template file in output: {:?}",
             entry.path()
         );
@@ -55,10 +62,19 @@ fn test_pyproject_toml_content() -> anyhow::Result<()> {
     TemplateEngine::new().generate(&basic_template_dir(), out.path(), &config)?;
 
     let content = fs::read_to_string(out.path().join("pyproject.toml"))?;
-    assert!(content.contains(r#"name = "my_project""#), "project_name not rendered");
-    assert!(content.contains("py312"), "python_version_short not rendered");
+    assert!(
+        content.contains(r#"name = "my_project""#),
+        "project_name not rendered"
+    );
+    assert!(
+        content.contains("py312"),
+        "python_version_short not rendered"
+    );
     assert!(content.contains("3.12"), "python_version not rendered");
-    assert!(!content.contains("{{"), "Tera syntax left over in pyproject.toml");
+    assert!(
+        !content.contains("{{"),
+        "Tera syntax left over in pyproject.toml"
+    );
 
     Ok(())
 }
@@ -71,8 +87,14 @@ fn test_main_py_content() -> anyhow::Result<()> {
     TemplateEngine::new().generate(&basic_template_dir(), out.path(), &config)?;
 
     let content = fs::read_to_string(out.path().join("src/my_project/main.py"))?;
-    assert!(content.contains("my_project"), "project_name not rendered in main.py");
-    assert!(content.contains("A Python project template"), "description not rendered");
+    assert!(
+        content.contains("my_project"),
+        "project_name not rendered in main.py"
+    );
+    assert!(
+        content.contains("A Python project template"),
+        "description not rendered"
+    );
     assert!(!content.contains("{{"), "Tera syntax left over in main.py");
 
     Ok(())
@@ -87,7 +109,10 @@ fn test_gitignore_copied_verbatim() -> anyhow::Result<()> {
 
     let source = fs::read("examples/basic-template/template/.gitignore")?;
     let generated = fs::read(out.path().join(".gitignore"))?;
-    assert_eq!(source, generated, ".gitignore should be a byte-identical copy");
+    assert_eq!(
+        source, generated,
+        ".gitignore should be a byte-identical copy"
+    );
 
     Ok(())
 }
@@ -101,13 +126,19 @@ fn test_post_processing_replace() -> anyhow::Result<()> {
 
     // Before post-processing, __AUTHOR__ placeholder is present
     let before = fs::read_to_string(out.path().join("pyproject.toml"))?;
-    assert!(before.contains("__AUTHOR__"), "__AUTHOR__ should be present before post-processing");
+    assert!(
+        before.contains("__AUTHOR__"),
+        "__AUTHOR__ should be present before post-processing"
+    );
 
     PostProcessor::new(out.path().to_path_buf()).execute(&config.post_processing)?;
 
     let after = fs::read_to_string(out.path().join("pyproject.toml"))?;
     assert!(after.contains("Darius"), "Author not replaced");
-    assert!(!after.contains("__AUTHOR__"), "__AUTHOR__ still present after post-processing");
+    assert!(
+        !after.contains("__AUTHOR__"),
+        "__AUTHOR__ still present after post-processing"
+    );
 
     Ok(())
 }

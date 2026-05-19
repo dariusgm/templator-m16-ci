@@ -4,7 +4,9 @@ use templator::{Config, PostProcessor, TemplateEngine};
 
 #[derive(Parser)]
 #[command(name = "templator")]
-#[command(about = "Generate projects from templates. Only files with a .template suffix have their content rendered; all others are copied verbatim.")]
+#[command(
+    about = "Generate projects from templates. Only files with a .template suffix have their content rendered; all others are copied verbatim."
+)]
 #[command(version)]
 struct Args {
     /// Template directory containing source files
