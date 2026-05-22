@@ -29,6 +29,38 @@ jobs:
       - name: Tests
         run: cargo test --verbose
 
+      # Code coverage with tarpaulin — minimum 95% required
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Generate coverage report
+        run: |
+          cargo tarpaulin \
+            --out Stdout \
+            --timeout 300 \
+            --include-files src/config.rs src/engine.rs src/post_process.rs \
+            --ignore-panics \
+            --ignore-tests \
+            | tee coverage.txt
+
+      - name: Extract and check coverage threshold (95%)
+        run: |
+          # Extract coverage percentage from tarpaulin output
+          coverage=$(grep -oP '\d+\.\d+(?=% coverage)' coverage.txt | tail -1)
+          if [ -z "$coverage" ]; then
+            echo "❌ Could not parse coverage from tarpaulin output"
+            cat coverage.txt | tail -10
+            exit 1
+          fi
+          echo "Code coverage: $coverage%"
+          if (( $(echo "$coverage < 95" | bc -l) )); then
+            echo "❌ Code coverage $coverage% is below 95% threshold"
+            cat coverage.txt | tail -20
+            exit 1
+          else
+            echo "✅ Code coverage $coverage% meets 95% threshold"
+          fi
+
       # rustsec/audit-check has no node24 release; run cargo-audit directly instead.
       # rust-cache caches ~/.cargo/bin, so the install is only slow on the first run.
       - name: Install cargo-audit
