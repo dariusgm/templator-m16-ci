@@ -38,8 +38,39 @@
 
 | File | Purpose |
 |---|---|
-| `examples/basic-template/templator.json` | Example configuration file declaring project name, variables (e.g., `project_name`, `python_version`), and post-processing steps. |
-| `examples/basic-template/template/` | Example template directory containing `.template` files (Tera-rendered) and static files; demonstrates `__project_name__` directory renaming and variable substitution. |
-| `examples/basic-template/template/pyproject.toml.template` | Tera template for Python project metadata; content rendered with variables from `templator.json`. |
-| `examples/basic-template/template/src/__project_name__/main.py.template` | Nested template file showing both directory-level `__var__` substitution and file-level Tera templating. |
-| `examples/basic-template/template/.gitignore` | Static file copied verbatim without rendering; no `.template` suffix means content is never modified. |
+| `examples/README.md` | Comprehensive guide to all examples with instructions for running each one and explanation of post-processing types. |
+
+### `basic-template` — Replace Post-Processing
+
+Demonstrates the `replace` post-processing step for literal string substitution.
+
+| File | Purpose |
+|---|---|
+| `examples/basic-template/templator.json` | Config with `replace` step that substitutes `__AUTHOR__` with "Darius" in `pyproject.toml`. |
+| `examples/basic-template/template/` | Python project template with variable substitution and static files. |
+| `examples/basic-template/template/pyproject.toml.template` | Tera template for Python metadata; author placeholder replaced via post-processing. |
+| `examples/basic-template/template/src/__project_name__/main.py.template` | Nested template file demonstrating `__var__` directory renaming and Tera variable injection. |
+| `examples/basic-template/template/.gitignore` | Static file copied verbatim; not rendered. |
+
+### `run-command-example` — RunCommand Post-Processing
+
+Demonstrates the `run_command` post-processing step for executing shell commands (e.g., chmod).
+
+| File | Purpose |
+|---|---|
+| `examples/run-command-example/templator.json` | Config with two `run_command` steps that make generated shell scripts executable via `chmod +x`. |
+| `examples/run-command-example/template/README.md.template` | Documentation template explaining how to use the generated scripts. |
+| `examples/run-command-example/template/scripts/setup.sh` | Shell script template; becomes executable after generation via post-processing. |
+| `examples/run-command-example/template/scripts/deploy.sh` | Shell script template; becomes executable after generation via post-processing. |
+
+### `full-featured-example` — Multiple Post-Processing Steps
+
+Demonstrates combining multiple post-processing steps (`replace` and `run_command`) in a single template.
+
+| File | Purpose |
+|---|---|
+| `examples/full-featured-example/templator.json` | Config with two `replace` steps (version, author, copyright year) and one `run_command` step (chmod). |
+| `examples/full-featured-example/template/Cargo.toml.template` | Rust manifest template with version and author placeholders for post-processing substitution. |
+| `examples/full-featured-example/template/src/lib/mod.rs.template` | Rust library module with copyright year placeholder for post-processing substitution. |
+| `examples/full-featured-example/template/README.md.template` | Documentation template with project name and description variables. |
+| `examples/full-featured-example/template/build.sh` | Shell script template; becomes executable via `run_command` post-processing. |
