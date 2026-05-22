@@ -8,6 +8,8 @@ pub struct Config {
     pub description: Option<String>,
     pub variables: HashMap<String, String>,
     #[serde(default)]
+    pub exclude: Vec<String>,
+    #[serde(default)]
     pub post_processing: Vec<PostProcessStep>,
 }
 
@@ -141,5 +143,26 @@ mod tests {
     fn test_parse_unknown_post_process_type_errors() {
         let json = r#"{"name":"t","variables":{},"post_processing":[{"type":"unknown_step"}]}"#;
         assert!(serde_json::from_str::<Config>(json).is_err());
+    }
+
+    #[test]
+    fn test_parse_exclude_patterns() {
+        let json = r#"{
+            "name": "test",
+            "variables": {},
+            "exclude": ["*.tmp", "build/", "node_modules/**"]
+        }"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.exclude.len(), 3);
+        assert_eq!(config.exclude[0], "*.tmp");
+        assert_eq!(config.exclude[1], "build/");
+        assert_eq!(config.exclude[2], "node_modules/**");
+    }
+
+    #[test]
+    fn test_parse_exclude_defaults_to_empty() {
+        let json = r#"{"name": "test", "variables": {}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(config.exclude.is_empty());
     }
 }

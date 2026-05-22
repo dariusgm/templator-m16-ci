@@ -58,6 +58,19 @@ Variables defined in `variables` override the top-level `name` and `description`
 
 Full Tera syntax is available: filters (`{{ value \| upper }}`), conditionals (`{% if … %}`), loops (`{% for … %}`), and the `default` filter (`{{ optional \| default(value="fallback") }}`).
 
+### File exclusion
+
+Files and directories can be excluded from the output using glob patterns in the `exclude` array:
+
+| Pattern | Matches | Example |
+|---|---|---|
+| `*.ext` | Files with specific extension | `*.tmp`, `*.draft` |
+| `filename` | Exact filename | `.env.example` |
+| `dir/` | Entire directory (requires trailing `/`) | `build/`, `node_modules/` |
+| `**/*.ext` | Files at any depth | `**/*.log` matches `src/logs/debug.log` |
+
+Excluded files are not copied to the output directory, allowing you to keep sensitive files, build artifacts, and temporary files in the template while generating clean projects.
+
 ## Config file (`templator.json`)
 
 ```json
@@ -70,6 +83,10 @@ Full Tera syntax is available: filters (`{{ value \| upper }}`), conditionals (`
     "python_version_short": "py312",
     "author": "Darius"
   },
+  "exclude": [
+    "*.draft",
+    ".env.example"
+  ],
   "post_processing": [
     {
       "type": "replace",
@@ -87,6 +104,7 @@ Full Tera syntax is available: filters (`{{ value \| upper }}`), conditionals (`
 | `name` | string | yes | Project name (available as `{{ name }}` in templates) |
 | `description` | string | no | Available as `{{ description }}` in templates |
 | `variables` | object | yes | Key/value pairs injected into the Tera context |
+| `exclude` | array | no | Glob patterns for files/directories to exclude from output |
 | `post_processing` | array | no | Steps to run after file generation |
 
 ### Post-processing steps

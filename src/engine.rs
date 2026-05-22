@@ -54,6 +54,12 @@ impl TemplateEngine {
                 continue;
             }
 
+            // Skip excluded paths
+            if is_excluded(rel_path, &config.exclude) {
+                log::debug!("Excluded: {}", rel_path.display());
+                continue;
+            }
+
             // Apply __var__ substitution to path components, then strip .template suffix
             let substituted = substitute_path(rel_path, &config.variables);
 
@@ -141,6 +147,73 @@ pub fn substitute_path(path: &Path, vars: &HashMap<String, String>) -> PathBuf {
     result
 }
 
+/// Check if a path matches any exclude pattern.
+/// Supports simple glob patterns: `*` matches any characters in a single component,
+/// `**` matches any number of path components.
+/// Paths are normalized to use forward slashes for cross-platform compatibility.
+pub fn is_excluded(path: &Path, patterns: &[String]) -> bool {
+    let path_str = normalize_path(&path.to_string_lossy());
+    for pattern in patterns {
+        if matches_pattern(&path_str, pattern) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Normalize a path to use forward slashes regardless of OS.
+fn normalize_path(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
+/// Match a path against a simple glob pattern.
+fn matches_pattern(path: &str, pattern: &str) -> bool {
+    // Exact match
+    if path == pattern {
+        return true;
+    }
+
+    // Directory exclusion (e.g., "build/" or "node_modules/")
+    if pattern.ends_with('/') {
+        let dir_pattern = &pattern[..pattern.len() - 1]; // Remove trailing '/'
+        return path == dir_pattern || path.starts_with(&format!("{}/", dir_pattern));
+    }
+
+    // Recursive wildcard: "**" matches everything
+    if pattern == "**" {
+        return true;
+    }
+
+    // Pattern with **/ prefix: "**/*.tmp" matches .tmp files at any depth
+    if pattern.starts_with("**/") {
+        let suffix = &pattern[3..]; // Remove "**/" prefix
+        if suffix.starts_with('*') {
+            // Handle patterns like "**/*.tmp"
+            let extension = &suffix[1..]; // Remove leading '*'
+            return path.ends_with(extension);
+        } else {
+            // Handle patterns like "**/node_modules/**"
+            if suffix.ends_with("/**") {
+                let dir = &suffix[..suffix.len() - 3]; // Remove trailing "/**"
+                return path == dir
+                    || path.starts_with(&format!("{}/", dir))
+                    || path.contains(&format!("/{}/", dir));
+            } else {
+                // Handle patterns like "**/specific/path"
+                return path.ends_with(suffix) || path.contains(&format!("/{}", suffix));
+            }
+        }
+    }
+
+    // Wildcard in filename: e.g., "*.tmp" or "*.bak"
+    if pattern.starts_with('*') && !pattern.contains('/') {
+        let suffix = &pattern[1..]; // Remove leading '*'
+        return path.ends_with(suffix);
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,6 +228,7 @@ mod tests {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
+            exclude: vec![],
             post_processing: vec![],
         }
     }
@@ -573,6 +647,190 @@ mod tests {
         assert_eq!(
             fs::read_to_string(output_dir.path().join("out.txt")).unwrap(),
             "fallback"
+        );
+    }
+
+    // --- matches_pattern: glob pattern matching ---
+
+    #[test]
+    fn test_matches_pattern_exact() {
+        assert!(matches_pattern("file.txt", "file.txt"));
+        assert!(!matches_pattern("file.txt", "other.txt"));
+    }
+
+    #[test]
+    fn test_matches_pattern_extension() {
+        assert!(matches_pattern("file.tmp", "*.tmp"));
+        assert!(matches_pattern("path/to/file.bak", "*.bak"));
+        assert!(!matches_pattern("file.txt", "*.tmp"));
+    }
+
+    #[test]
+    fn test_matches_pattern_directory() {
+        assert!(matches_pattern("build/file.o", "build/"));
+        assert!(matches_pattern("build/nested/file.o", "build/"));
+        assert!(!matches_pattern("src/file.rs", "build/"));
+    }
+
+    #[test]
+    fn test_matches_pattern_recursive_wildcard() {
+        assert!(matches_pattern("anything", "**"));
+        assert!(matches_pattern("deeply/nested/path", "**"));
+    }
+
+    #[test]
+    fn test_matches_pattern_recursive_with_suffix() {
+        assert!(matches_pattern("node_modules/pkg/index.js", "**/*.js"));
+        assert!(matches_pattern("deep/nested/file.tmp", "**/*.tmp"));
+        assert!(!matches_pattern("file.rs", "**/*.js"));
+    }
+
+    // --- is_excluded: path exclusion ---
+
+    #[test]
+    fn test_is_excluded_empty_patterns() {
+        assert!(!is_excluded(Path::new("file.txt"), &[]));
+        assert!(!is_excluded(Path::new("build/artifact"), &[]));
+    }
+
+    #[test]
+    fn test_is_excluded_single_pattern() {
+        let patterns = vec!["*.tmp".to_string()];
+        assert!(is_excluded(Path::new("file.tmp"), &patterns));
+        assert!(!is_excluded(Path::new("file.txt"), &patterns));
+    }
+
+    #[test]
+    fn test_is_excluded_multiple_patterns() {
+        let patterns = vec![
+            "*.tmp".to_string(),
+            "build/".to_string(),
+            "**/*.bak".to_string(),
+        ];
+        assert!(is_excluded(Path::new("file.tmp"), &patterns));
+        assert!(is_excluded(Path::new("build/artifact"), &patterns));
+        assert!(is_excluded(Path::new("src/old.bak"), &patterns));
+        assert!(!is_excluded(Path::new("src/main.rs"), &patterns));
+    }
+
+    // --- generate: exclude patterns prevent file copying ---
+
+    #[test]
+    fn test_generate_excludes_files_by_extension() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        fs::write(template_dir.path().join("keep.txt"), "keep").unwrap();
+        fs::write(template_dir.path().join("skip.tmp"), "skip").unwrap();
+
+        let mut config = make_config(&[]);
+        config.exclude = vec!["*.tmp".to_string()];
+
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert!(
+            output_dir.path().join("keep.txt").exists(),
+            "keep.txt should exist"
+        );
+        assert!(
+            !output_dir.path().join("skip.tmp").exists(),
+            "skip.tmp should be excluded"
+        );
+    }
+
+    #[test]
+    fn test_generate_excludes_entire_directories() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        fs::create_dir(template_dir.path().join("src")).unwrap();
+        fs::create_dir(template_dir.path().join("build")).unwrap();
+
+        fs::write(template_dir.path().join("src/main.rs"), "code").unwrap();
+        fs::write(template_dir.path().join("build/artifact"), "binary").unwrap();
+
+        let mut config = make_config(&[]);
+        config.exclude = vec!["build/".to_string()];
+
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert!(output_dir.path().join("src").exists(), "src/ should exist");
+        assert!(
+            output_dir.path().join("src/main.rs").exists(),
+            "src/main.rs should exist"
+        );
+        assert!(
+            !output_dir.path().join("build").exists(),
+            "build/ should be excluded"
+        );
+    }
+
+    #[test]
+    fn test_generate_excludes_recursive_patterns() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        fs::create_dir_all(template_dir.path().join("src")).unwrap();
+        fs::create_dir_all(template_dir.path().join("node_modules/pkg")).unwrap();
+
+        fs::write(
+            template_dir.path().join("node_modules/pkg/index.js"),
+            "js code",
+        )
+        .unwrap();
+        fs::write(template_dir.path().join("src/main.js"), "code").unwrap();
+
+        let mut config = make_config(&[]);
+        config.exclude = vec!["node_modules/".to_string()];
+
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert!(
+            output_dir.path().join("src/main.js").exists(),
+            "src/main.js should exist"
+        );
+        assert!(
+            !output_dir.path().join("node_modules").exists(),
+            "node_modules should be excluded"
+        );
+    }
+
+    #[test]
+    fn test_generate_excludes_template_files() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        fs::write(
+            template_dir.path().join("config.template"),
+            "excluded: {{ value }}",
+        )
+        .unwrap();
+        fs::write(
+            template_dir.path().join("README.template"),
+            "keep: {{ value }}",
+        )
+        .unwrap();
+
+        let mut config = make_config(&[("value", "test")]);
+        config.exclude = vec!["config.template".to_string()];
+
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config)
+            .unwrap();
+
+        assert!(
+            !output_dir.path().join("config").exists(),
+            "config (from config.template) should be excluded"
+        );
+        assert_eq!(
+            fs::read_to_string(output_dir.path().join("README")).unwrap(),
+            "keep: test"
         );
     }
 }

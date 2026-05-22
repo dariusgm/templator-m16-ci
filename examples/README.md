@@ -83,6 +83,41 @@ templator \
 
 ---
 
+### 4. `exclude-example` — File Exclusion
+
+Demonstrates the `exclude` feature to prevent certain files from being copied to the output directory.
+
+**Features:**
+- Pattern-based file exclusion (extension, directory, recursive)
+- Multiple exclusion patterns in a single config
+- Shows which files are included vs. excluded
+
+**Run:**
+```bash
+templator \
+  --template examples/exclude-example/template \
+  --config examples/exclude-example/templator.json \
+  --output /tmp/project-with-exclusions
+```
+
+**What happens:**
+1. Files matching `*.draft` are excluded (draft versions)
+2. `docs/private/` directory is excluded entirely
+3. `.env.example` is excluded by exact name
+4. `build/` directory is excluded (build artifacts)
+5. All `**/*.tmp` files are excluded (temporary files)
+6. Only public source files and documentation are included
+
+**Exclude patterns:**
+- `*.ext` — exclude files with specific extension
+- `dir/` — exclude entire directory
+- `filename` — exclude by exact name
+- `**/*.ext` — exclude files with extension at any depth
+
+**Use case:** Remove sensitive files, build artifacts, drafts, and temporary files from generated projects.
+
+---
+
 ## Post-Processing Reference
 
 ### `replace` — String Substitution
@@ -130,6 +165,42 @@ Command runs via `sh -c` with the output directory as the working directory.
 - Initialize repositories or databases
 - Format generated code
 
+## Exclusion Reference
+
+### `exclude` — File and Directory Exclusion
+
+```json
+{
+  "exclude": [
+    "*.draft",
+    "docs/private/",
+    ".env.example",
+    "build/",
+    "**/*.tmp"
+  ]
+}
+```
+
+Files and directories matching any pattern in the `exclude` array will not be copied to the output directory.
+
+**Supported patterns:**
+- `*.ext` — files with specific extension (e.g., `*.tmp`, `*.bak`)
+- `filename` — exact filename match (e.g., `.env.example`)
+- `dir/` — entire directory (trailing slash required)
+- `**/*.ext` — files with extension at any directory depth
+
+**Constraints:**
+- Patterns are matched against relative paths from template root
+- Directory patterns must end with `/`
+- Paths use forward slashes regardless of OS
+
+**Use cases:**
+- Exclude sensitive example files (`.env.example`)
+- Remove build artifacts (`build/`, `dist/`)
+- Skip draft or temporary files (`*.draft`, `*.tmp`)
+- Hide internal documentation (`docs/private/`)
+- Remove version control (`build/`)
+
 ### `preserve_sections` — Reserved (Not Yet Implemented)
 
 This post-processing type is planned for future releases. It will allow preserving user-edited sections of generated files across template regenerations.
@@ -158,6 +229,12 @@ cargo run -- \
   --template examples/full-featured-example/template \
   --config examples/full-featured-example/templator.json \
   --output /tmp/test-full-featured
+
+# Test exclude-example
+cargo run -- \
+  --template examples/exclude-example/template \
+  --config examples/exclude-example/templator.json \
+  --output /tmp/test-exclude
 ```
 
 Each example exercises different aspects of templator's functionality and can serve as a reference for your own templates.

@@ -176,6 +176,7 @@ fn test_tera_syntax_error_returns_error() {
         name: "test".into(),
         description: None,
         variables: HashMap::new(),
+        exclude: vec![],
         post_processing: vec![],
     };
 
@@ -226,6 +227,7 @@ fn test_multiple_path_substitutions_end_to_end() -> anyhow::Result<()> {
             ("org".into(), "acme".into()),
             ("project".into(), "widget".into()),
         ]),
+        exclude: vec![],
         post_processing: vec![],
     };
 

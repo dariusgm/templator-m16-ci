@@ -1,0 +1,18 @@
+# {{ name }}
+
+{{ description }}
+
+## Files in this template
+
+- `README.md` - **INCLUDED** - main documentation
+- `src/main.rs` - **INCLUDED** - source code
+- `src/main.rs.draft` - **EXCLUDED** - draft version (matches `*.draft`)
+- `docs/guide.md` - **INCLUDED** - public documentation
+- `docs/private/notes.md` - **EXCLUDED** - private notes (matches `docs/private/`)
+- `.env.example` - **EXCLUDED** - example env file (exact match)
+- `build/artifacts` - **EXCLUDED** - build output directory (matches `build/`)
+- `temp/cache.tmp` - **EXCLUDED** - temporary file (matches `**/*.tmp`)
+
+## Generated files
+
+After running templator, the output directory will contain only the INCLUDED files above.

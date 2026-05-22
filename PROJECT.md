@@ -74,3 +74,19 @@ Demonstrates combining multiple post-processing steps (`replace` and `run_comman
 | `examples/full-featured-example/template/src/lib/mod.rs.template` | Rust library module with copyright year placeholder for post-processing substitution. |
 | `examples/full-featured-example/template/README.md.template` | Documentation template with project name and description variables. |
 | `examples/full-featured-example/template/build.sh` | Shell script template; becomes executable via `run_command` post-processing. |
+
+### `exclude-example` — File Exclusion
+
+Demonstrates the `exclude` feature to prevent certain files from being copied to output.
+
+| File | Purpose |
+|---|---|
+| `examples/exclude-example/templator.json` | Config with `exclude` patterns for drafts, private docs, build artifacts, and temp files. |
+| `examples/exclude-example/template/README.md.template` | Template documenting which files are included vs. excluded. |
+| `examples/exclude-example/template/src/main.rs` | Source file that is **included** in output. |
+| `examples/exclude-example/template/src/main.rs.draft` | Draft version matching `*.draft` pattern; **excluded** from output. |
+| `examples/exclude-example/template/docs/guide.md` | Public documentation that is **included** in output. |
+| `examples/exclude-example/template/docs/private/notes.md` | Private notes in `docs/private/` directory; **excluded** from output. |
+| `examples/exclude-example/template/.env.example` | Example env file excluded by exact name match. |
+| `examples/exclude-example/template/build/artifact.o` | Build output in `build/` directory; **excluded** from output. |
+| `examples/exclude-example/template/temp/cache.tmp` | Temporary file matching `**/*.tmp` pattern; **excluded** from output. |

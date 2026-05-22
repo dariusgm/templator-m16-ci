@@ -1,0 +1,5 @@
+// Draft version - this file will be EXCLUDED
+// (matches *.draft pattern)
+fn main() {
+    println!("Draft - not included");
+}
