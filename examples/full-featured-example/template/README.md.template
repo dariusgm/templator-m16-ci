@@ -1,0 +1,21 @@
+# {{ name }}
+
+{{ description }}
+
+## Building
+
+The project includes a build script that can be executed after generation:
+
+```bash
+./build.sh
+```
+
+## Features
+
+- Written in Rust 2021 edition
+- Comprehensive post-processing (version substitution, author replacement, executable setup)
+- Ready-to-use library structure
+
+## License
+
+Copyright (c) LICENSE_YEAR {{ author_name }}

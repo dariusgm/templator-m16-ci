@@ -1,0 +1,30 @@
+{
+  "name": "my-rust-lib",
+  "description": "A comprehensive Rust library with build scripts",
+  "variables": {
+    "crate_name": "my_awesome_lib",
+    "version": "0.1.0",
+    "author_name": "Alice"
+  },
+  "post_processing": [
+    {
+      "type": "replace",
+      "file": "Cargo.toml",
+      "patterns": [
+        { "from": "__VERSION__", "to": "0.1.0" },
+        { "from": "__AUTHOR__", "to": "Alice" }
+      ]
+    },
+    {
+      "type": "replace",
+      "file": "src/lib/mod.rs",
+      "patterns": [
+        { "from": "LICENSE_YEAR", "to": "2026" }
+      ]
+    },
+    {
+      "type": "run_command",
+      "command": "chmod +x build.sh"
+    }
+  ]
+}
