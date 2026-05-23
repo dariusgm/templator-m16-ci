@@ -1,0 +1,2 @@
+DEBUG: This is a log file
+This is EXCLUDED by pre_processing Exclude pattern: *.log

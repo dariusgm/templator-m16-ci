@@ -71,6 +71,35 @@ Files and directories can be excluded from the output using glob patterns in the
 
 Excluded files are not copied to the output directory, allowing you to keep sensitive files, build artifacts, and temporary files in the template while generating clean projects.
 
+### Pre-processing
+
+`pre_processing` steps run before the engine walks the template directory. Currently, only the `exclude` step type is supported.
+
+#### `exclude` — additional glob patterns
+
+```json
+"pre_processing": [
+  {
+    "type": "exclude",
+    "patterns": ["*.log", "temp/", "docs/internal/"]
+  }
+]
+```
+
+Patterns are merged with any patterns already listed in the top-level `exclude` array.
+Both are additive: a file is excluded if it matches any pattern from either source.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | string | yes | Must be `"exclude"` |
+| `patterns` | array of strings | yes | Glob patterns using the same syntax as `exclude` |
+
+**Why use `pre_processing.exclude` instead of `exclude`?**
+- Organisational: group exclusions that belong together (e.g., all CI artifacts in one step, all draft files in another).
+- Future-proofing: additional `pre_processing` step types will run in the same phase, letting you express more complex setup logic.
+
+Both mechanisms co-exist. You can use one, the other, or both simultaneously.
+
 ## Config file (`templator.json`)
 
 ```json
@@ -105,6 +134,7 @@ Excluded files are not copied to the output directory, allowing you to keep sens
 | `description` | string | no | Available as `{{ description }}` in templates |
 | `variables` | object | yes | Key/value pairs injected into the Tera context |
 | `exclude` | array | no | Glob patterns for files/directories to exclude from output |
+| `pre_processing` | array | no | Steps to run before file generation |
 | `post_processing` | array | no | Steps to run after file generation |
 
 ### Post-processing steps

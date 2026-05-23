@@ -17,8 +17,9 @@
 |---|---|
 | `src/main.rs` | CLI entry point using clap to parse `--template`, `--config`, and `--output` arguments; orchestrates template generation and post-processing. |
 | `src/lib.rs` | Library root that exports the public API: `Config`, `TemplateEngine`, and `PostProcessor`. |
-| `src/config.rs` | Serde structs for deserializing `templator.json`: `Config` (name, variables, post_processing) and `PostProcessStep` enum (Replace, RunCommand, PreserveSections). |
+| `src/config.rs` | Serde structs for deserializing `templator.json`: `Config` (name, variables, exclude, pre_processing, post_processing), `PreProcessStep` enum (Exclude), and `PostProcessStep` enum (Replace, RunCommand, PreserveSections). |
 | `src/engine.rs` | Core template processing: walks the template directory, applies `__var__` substitution to filenames, and renders `.template` files via Tera with variable context. |
+| `src/pre_process.rs` | Pre-generation phase: `PreProcessor::effective_exclude` merges `config.exclude` with patterns from `pre_processing` Exclude steps to produce the list fed to the engine's path filter. |
 | `src/post_process.rs` | Post-generation steps: `replace` for literal string substitution and `run_command` to execute shell commands, with path traversal and symlink escape protection. |
 
 ## Tests
@@ -90,3 +91,18 @@ Demonstrates the `exclude` feature to prevent certain files from being copied to
 | `examples/exclude-example/template/.env.example` | Example env file excluded by exact name match. |
 | `examples/exclude-example/template/build/artifact.o` | Build output in `build/` directory; **excluded** from output. |
 | `examples/exclude-example/template/temp/cache.tmp` | Temporary file matching `**/*.tmp` pattern; **excluded** from output. |
+
+### `pre-processing-example` — Pre-Processing Exclusion
+
+Demonstrates using `pre_processing` Exclude steps alongside `config.exclude` to show that both mechanisms are additive.
+
+| File | Purpose |
+|---|---|
+| `examples/pre-processing-example/templator.json` | Config with both `exclude` and `pre_processing` Exclude patterns. |
+| `examples/pre-processing-example/template/README.md.template` | Template file included in output. |
+| `examples/pre-processing-example/template/src/__project_name__/main.py.template` | Nested template demonstrating variable-based directory renaming. |
+| `examples/pre-processing-example/template/docs/guide.md` | Static file included verbatim. |
+| `examples/pre-processing-example/template/docs/internal/architecture.md` | Internal doc excluded by pre_processing Exclude (docs/internal/). |
+| `examples/pre-processing-example/template/temp/scratch.txt` | Temp file excluded by pre_processing Exclude (temp/). |
+| `examples/pre-processing-example/template/debug.log` | Log file excluded by pre_processing Exclude (*.log). |
+| `examples/pre-processing-example/template/main.py.draft` | Draft file excluded by config.exclude (*.draft). |

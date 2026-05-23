@@ -1,0 +1,11 @@
+# {{ name }}
+
+{{ description }}
+
+Author: {{ author }}
+
+## Notes
+
+This project was generated with pre_processing exclusions active.
+Only source files and docs/guide.md are present.
+Internal documentation, temporary files, logs, and drafts have been excluded.

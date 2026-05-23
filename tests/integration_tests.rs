@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use templator::{config::PostProcessStep, Config, PostProcessor, TemplateEngine};
+use templator::{
+    config::{PostProcessStep, PreProcessStep},
+    Config, PostProcessor, TemplateEngine,
+};
 use walkdir::WalkDir;
 
 fn basic_template_dir() -> PathBuf {
@@ -177,6 +180,7 @@ fn test_tera_syntax_error_returns_error() {
         description: None,
         variables: HashMap::new(),
         exclude: vec![],
+        pre_processing: vec![],
         post_processing: vec![],
     };
 
@@ -228,6 +232,7 @@ fn test_multiple_path_substitutions_end_to_end() -> anyhow::Result<()> {
             ("project".into(), "widget".into()),
         ]),
         exclude: vec![],
+        pre_processing: vec![],
         post_processing: vec![],
     };
 
@@ -236,6 +241,117 @@ fn test_multiple_path_substitutions_end_to_end() -> anyhow::Result<()> {
     let out_file = output_dir.path().join("src/acme/widget/main.py");
     assert!(out_file.exists(), "nested path substitution failed");
     assert_eq!(fs::read_to_string(out_file)?, "# acme.widget");
+
+    Ok(())
+}
+
+#[test]
+fn test_pre_processing_exclude_example() -> anyhow::Result<()> {
+    let config_path = PathBuf::from("examples/pre-processing-example/templator.json");
+    let config = Config::from_file(&config_path)?;
+    let out = tempfile::tempdir()?;
+    TemplateEngine::new().generate(
+        &PathBuf::from("examples/pre-processing-example/template"),
+        out.path(),
+        &config,
+    )?;
+
+    // Included files exist
+    assert!(out.path().join("README.md").exists(), "README.md missing");
+    assert!(
+        out.path().join("docs/guide.md").exists(),
+        "docs/guide.md missing"
+    );
+    assert!(
+        out.path().join("src/my_app/main.py").exists(),
+        "src/my_app/main.py missing"
+    );
+
+    // Excluded by pre_processing (*.log)
+    assert!(
+        !out.path().join("debug.log").exists(),
+        "debug.log should be excluded"
+    );
+    // Excluded by pre_processing (temp/)
+    assert!(
+        !out.path().join("temp").exists(),
+        "temp/ should be excluded"
+    );
+    // Excluded by pre_processing (docs/internal/)
+    assert!(
+        !out.path().join("docs/internal").exists(),
+        "docs/internal/ should be excluded"
+    );
+    // Excluded by config.exclude (*.draft)
+    assert!(
+        !out.path().join("main.py.draft").exists(),
+        "main.py.draft should be excluded"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_pre_processing_exclude_additive_with_config_exclude() -> anyhow::Result<()> {
+    let template_dir = tempfile::tempdir()?;
+    let output_dir = tempfile::tempdir()?;
+
+    fs::write(template_dir.path().join("keep.txt"), "keep")?;
+    fs::write(template_dir.path().join("skip.tmp"), "skip")?;
+    fs::write(template_dir.path().join("skip.log"), "skip")?;
+
+    let config = Config {
+        name: "test".into(),
+        description: None,
+        variables: HashMap::new(),
+        exclude: vec!["*.tmp".to_string()],
+        pre_processing: vec![PreProcessStep::Exclude {
+            patterns: vec!["*.log".to_string()],
+        }],
+        post_processing: vec![],
+    };
+
+    TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config)?;
+
+    assert!(
+        output_dir.path().join("keep.txt").exists(),
+        "keep.txt should exist"
+    );
+    assert!(
+        !output_dir.path().join("skip.tmp").exists(),
+        "skip.tmp should be excluded by config.exclude"
+    );
+    assert!(
+        !output_dir.path().join("skip.log").exists(),
+        "skip.log should be excluded by pre_processing"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_pre_processing_empty_steps_backward_compatible() -> anyhow::Result<()> {
+    let json = r#"{"name": "compat-test", "variables": {}, "exclude": ["*.tmp"]}"#;
+    let config: Config = serde_json::from_str(json)?;
+    assert!(
+        config.pre_processing.is_empty(),
+        "pre_processing should default to empty"
+    );
+
+    let template_dir = tempfile::tempdir()?;
+    let output_dir = tempfile::tempdir()?;
+    fs::write(template_dir.path().join("keep.txt"), "ok")?;
+    fs::write(template_dir.path().join("skip.tmp"), "gone")?;
+
+    TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config)?;
+    assert!(
+        output_dir.path().join("keep.txt").exists(),
+        "keep.txt should exist"
+    );
+    assert!(
+        !output_dir.path().join("skip.tmp").exists(),
+        "skip.tmp should be excluded"
+    );
 
     Ok(())
 }

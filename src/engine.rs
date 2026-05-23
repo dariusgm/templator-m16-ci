@@ -3,6 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::config::Config;
+use crate::pre_process::PreProcessor;
 
 pub struct TemplateEngine;
 
@@ -30,6 +31,10 @@ impl TemplateEngine {
             context.insert(key, value);
         }
 
+        // Compute the effective exclude list by merging config.exclude with pre_processing patterns
+        let effective_exclude =
+            PreProcessor::new().effective_exclude(&config.exclude, &config.pre_processing);
+
         for entry in WalkDir::new(template_dir).into_iter() {
             let entry = match entry {
                 Ok(e) => e,
@@ -55,7 +60,7 @@ impl TemplateEngine {
             }
 
             // Skip excluded paths
-            if is_excluded(rel_path, &config.exclude) {
+            if is_excluded(rel_path, &effective_exclude) {
                 log::debug!("Excluded: {}", rel_path.display());
                 continue;
             }
@@ -174,8 +179,7 @@ fn matches_pattern(path: &str, pattern: &str) -> bool {
     }
 
     // Directory exclusion (e.g., "build/" or "node_modules/")
-    if pattern.ends_with('/') {
-        let dir_pattern = &pattern[..pattern.len() - 1]; // Remove trailing '/'
+    if let Some(dir_pattern) = pattern.strip_suffix('/') {
         return path == dir_pattern || path.starts_with(&format!("{}/", dir_pattern));
     }
 
@@ -185,16 +189,13 @@ fn matches_pattern(path: &str, pattern: &str) -> bool {
     }
 
     // Pattern with **/ prefix: "**/*.tmp" matches .tmp files at any depth
-    if pattern.starts_with("**/") {
-        let suffix = &pattern[3..]; // Remove "**/" prefix
-        if suffix.starts_with('*') {
+    if let Some(suffix) = pattern.strip_prefix("**/") {
+        if let Some(extension) = suffix.strip_prefix('*') {
             // Handle patterns like "**/*.tmp"
-            let extension = &suffix[1..]; // Remove leading '*'
             return path.ends_with(extension);
         } else {
             // Handle patterns like "**/node_modules/**"
-            if suffix.ends_with("/**") {
-                let dir = &suffix[..suffix.len() - 3]; // Remove trailing "/**"
+            if let Some(dir) = suffix.strip_suffix("/**") {
                 return path == dir
                     || path.starts_with(&format!("{}/", dir))
                     || path.contains(&format!("/{}/", dir));
@@ -206,9 +207,10 @@ fn matches_pattern(path: &str, pattern: &str) -> bool {
     }
 
     // Wildcard in filename: e.g., "*.tmp" or "*.bak"
-    if pattern.starts_with('*') && !pattern.contains('/') {
-        let suffix = &pattern[1..]; // Remove leading '*'
-        return path.ends_with(suffix);
+    if let Some(suffix) = pattern.strip_prefix('*') {
+        if !pattern.contains('/') {
+            return path.ends_with(suffix);
+        }
     }
 
     false
@@ -229,6 +231,7 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
             exclude: vec![],
+            pre_processing: vec![],
             post_processing: vec![],
         }
     }

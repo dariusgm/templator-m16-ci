@@ -10,6 +10,8 @@ pub struct Config {
     #[serde(default)]
     pub exclude: Vec<String>,
     #[serde(default)]
+    pub pre_processing: Vec<PreProcessStep>,
+    #[serde(default)]
     pub post_processing: Vec<PostProcessStep>,
 }
 
@@ -31,6 +33,13 @@ pub enum PostProcessStep {
 pub struct ReplacePattern {
     pub from: String,
     pub to: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum PreProcessStep {
+    #[serde(rename = "exclude")]
+    Exclude { patterns: Vec<String> },
 }
 
 impl Config {
@@ -164,5 +173,39 @@ mod tests {
         let json = r#"{"name": "test", "variables": {}}"#;
         let config: Config = serde_json::from_str(json).unwrap();
         assert!(config.exclude.is_empty());
+    }
+
+    #[test]
+    fn test_parse_pre_processing_defaults_to_empty() {
+        let json = r#"{"name": "test", "variables": {}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(config.pre_processing.is_empty());
+    }
+
+    #[test]
+    fn test_parse_pre_processing_exclude_step() {
+        let json = r#"{
+            "name": "test",
+            "variables": {},
+            "pre_processing": [{
+                "type": "exclude",
+                "patterns": ["*.log", "temp/"]
+            }]
+        }"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.pre_processing.len(), 1);
+        match &config.pre_processing[0] {
+            PreProcessStep::Exclude { patterns } => {
+                assert_eq!(patterns.len(), 2);
+                assert_eq!(patterns[0], "*.log");
+                assert_eq!(patterns[1], "temp/");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_unknown_pre_process_type_errors() {
+        let json = r#"{"name":"t","variables":{},"pre_processing":[{"type":"unknown_step"}]}"#;
+        assert!(serde_json::from_str::<Config>(json).is_err());
     }
 }
