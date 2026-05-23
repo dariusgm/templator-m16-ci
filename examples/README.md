@@ -127,14 +127,16 @@ templator \
 
 **Exclude patterns used:**
 ```json
-"exclude": [
-  ".git/objects/",
-  ".git/refs/",
-  ".git/logs/",
-  ".git/config",
-  ".git/HEAD",
-  ".git/description"
-]
+{
+  "exclude": [
+    ".git/objects/",
+    ".git/refs/",
+    ".git/logs/",
+    ".git/config",
+    ".git/HEAD",
+    ".git/description"
+  ]
+}
 ```
 
 This keeps only the hooks directory while excluding the git database.
@@ -205,9 +207,80 @@ Files and directories matching any pattern in the `exclude` array will not be co
 - Hide internal documentation (`docs/private/`)
 - Remove version control (`build/`)
 
-### `preserve_sections` — Reserved (Not Yet Implemented)
+### 5. `preserve-sections-example` — Preserve Sections Across Regenerations
 
-This post-processing type is planned for future releases. It will allow preserving user-edited sections of generated files across template regenerations.
+Demonstrates the `preserve_sections` post-processing step for protecting user-edited content when templates are regenerated.
+
+**Features:**
+- Python project template with `pyproject.toml`
+- User-controlled section marked with begin/end markers
+- Preserves user dependencies or configurations across regenerations
+- Supports multiple user sections in a single file
+
+**Run:**
+```bash
+templator \
+  --template examples/preserve-sections-example \
+  --answers examples/preserve-sections-example-answers.json \
+  --output /tmp/my-python-app
+```
+
+**What happens:**
+1. Template renders `pyproject.toml` with project metadata (name, version, author)
+2. Empty user section is created between markers: `# [preserve:begin]` and `# [preserve:end]`
+3. User can add custom dependencies or settings between the markers
+4. On regeneration, template content is refreshed and user section is preserved
+
+**How it works on regeneration:**
+1. First generation produces `pyproject.toml` with empty user section
+2. User edits the file and adds dependencies between markers:
+   ```toml
+   # [preserve:begin]
+   dependencies = [
+       "requests>=2.31",
+       "pydantic>=2.0",
+   ]
+   # [preserve:end]
+   ```
+3. Re-running `templator` with same output directory:
+   - Template metadata is refreshed (e.g., updated version, author)
+   - User's dependencies section is preserved in the output
+4. Result: template controls everything outside markers, user content inside markers survives
+
+**Use case:** Regenerate project templates while preserving user configurations, custom dependencies, or other edits made after initial generation.
+
+### `preserve_sections` — Post-Processing Reference
+
+```json
+{
+  "type": "preserve_sections",
+  "file": "path/to/file.txt",
+  "begin_marker": "# [preserve:begin]",
+  "end_marker": "# [preserve:end]"
+}
+```
+
+**Markers:**
+- `begin_marker` — line or string that starts a user-controlled section
+- `end_marker` — line or string that ends a user-controlled section
+- Content between markers is preserved when the template is regenerated
+- Everything outside markers is regenerated from the template each time
+
+**Multiple sections per file:**
+- A single file can have multiple begin/end marker pairs
+- Pairs are matched positionally (1st begin/end in old file matches 1st pair in new file)
+- Each section is independently preserved
+
+**Constraints:**
+- File path must be relative (no `..` or absolute paths)
+- Cannot escape the output directory via symlinks
+- Markers must be present in both old and new file versions to match
+
+**Use cases:**
+- Preserve user-added dependencies while template controls `[project]` metadata
+- Keep custom configuration settings across template updates
+- Allow users to add entries to generated files without overwriting them on regeneration
+- Protect sections of code or configuration that users have customized
 
 ---
 
@@ -217,7 +290,7 @@ To verify all examples work correctly:
 
 ```bash
 # Test basic-template
-cargo run -- \
+cargo run -- \m
   --template examples/basic-template \
   --answers examples/basic-answers.json \
   --output /tmp/test-basic
@@ -242,6 +315,27 @@ cargo run -- \
 
 # Verify git hooks were copied and are executable
 ls -la /tmp/test-hooks/.git/hooks/
+
+# Test preserve-sections-example (first generation)
+cargo run -- \
+  --template examples/preserve-sections-example \
+  --answers examples/preserve-sections-example-answers.json \
+  --output /tmp/test-preserve
+
+# Check the generated pyproject.toml
+cat /tmp/test-preserve/pyproject.toml
+
+# Simulate user adding dependencies (edit the file between markers)
+# sed -i '/\[preserve:begin\]/a\  "requests>=2.31",\n  "pydantic>=2.0",' /tmp/test-preserve/pyproject.toml
+
+# Test preserve-sections-example (regeneration)
+cargo run -- \
+  --template examples/preserve-sections-example \
+  --answers examples/preserve-sections-example-answers.json \
+  --output /tmp/test-preserve
+
+# Verify pyproject.toml still has the user-added entries between markers
+cat /tmp/test-preserve/pyproject.toml
 ```
 
 Each example exercises different aspects of templator's functionality and can serve as a reference for your own templates.

@@ -54,12 +54,17 @@ fn main() -> anyhow::Result<()> {
     answers.validate_against(&config)?;
     let variables = answers.resolve(&config);
 
+    let mut post_processor = PostProcessor::new(args.output.clone());
+    if !config.post_processing.is_empty() {
+        post_processor.snapshot_preserved_sections(&config.post_processing);
+    }
+
     let template_content_dir = args.template.join("template");
     TemplateEngine::new().generate(&template_content_dir, &args.output, &config, &variables)?;
     println!("Files generated.");
 
     if !config.post_processing.is_empty() {
-        PostProcessor::new(args.output.clone()).execute(&config.post_processing)?;
+        post_processor.execute(&config.post_processing)?;
         println!("Post-processing done.");
     }
 

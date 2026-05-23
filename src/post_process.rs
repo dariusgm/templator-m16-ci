@@ -1,21 +1,59 @@
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
 use crate::config::{PostProcessStep, ReplacePattern};
 
 pub struct PostProcessor {
     working_dir: PathBuf,
+    preserved_sections: HashMap<String, Vec<String>>,
 }
 
 impl PostProcessor {
     pub fn new(working_dir: PathBuf) -> Self {
-        Self { working_dir }
+        Self {
+            working_dir,
+            preserved_sections: HashMap::new(),
+        }
+    }
+
+    pub fn snapshot_preserved_sections(&mut self, steps: &[PostProcessStep]) {
+        for step in steps {
+            if let PostProcessStep::PreserveSections {
+                file,
+                begin_marker,
+                end_marker,
+            } = step
+            {
+                let file_path = Path::new(file);
+                if file_path.is_absolute()
+                    || file_path.components().any(|c| c == Component::ParentDir)
+                {
+                    continue;
+                }
+                if let Ok(content) = std::fs::read_to_string(self.working_dir.join(file)) {
+                    let sections = extract_user_sections(&content, begin_marker, end_marker);
+                    if !sections.is_empty() {
+                        log::debug!(
+                            "preserve_sections: snapshotted {} section(s) from '{}'",
+                            sections.len(),
+                            file
+                        );
+                        self.preserved_sections.insert(file.clone(), sections);
+                    }
+                }
+            }
+        }
     }
 
     pub fn execute(&self, steps: &[PostProcessStep]) -> anyhow::Result<()> {
         for step in steps {
             match step {
-                PostProcessStep::PreserveSections { file, marker } => {
-                    self.preserve_sections(file, marker)?;
+                PostProcessStep::PreserveSections {
+                    file,
+                    begin_marker,
+                    end_marker,
+                } => {
+                    self.preserve_sections(file, begin_marker, end_marker)?;
                 }
                 PostProcessStep::Replace { file, patterns } => {
                     self.replace_in_file(file, patterns)?;
@@ -25,8 +63,52 @@ impl PostProcessor {
         Ok(())
     }
 
-    fn preserve_sections(&self, _file: &str, _marker: &str) -> anyhow::Result<()> {
-        anyhow::bail!("preserve_sections is not yet implemented");
+    fn preserve_sections(
+        &self,
+        file: &str,
+        begin_marker: &str,
+        end_marker: &str,
+    ) -> anyhow::Result<()> {
+        let file_path = Path::new(file);
+        if file_path.is_absolute() || file_path.components().any(|c| c == Component::ParentDir) {
+            anyhow::bail!(
+                "preserve_sections path '{}' must be relative and non-traversing",
+                file
+            );
+        }
+        let path = self.working_dir.join(file);
+        let canonical_working_dir = self.working_dir.canonicalize()?;
+        let canonical_path = path
+            .canonicalize()
+            .map_err(|e| anyhow::anyhow!("Cannot read '{}': {}", file, e))?;
+        if !canonical_path.starts_with(&canonical_working_dir) {
+            anyhow::bail!(
+                "preserve_sections path '{}' resolves outside output directory",
+                file
+            );
+        }
+
+        let generated = std::fs::read_to_string(&canonical_path)
+            .map_err(|e| anyhow::anyhow!("Cannot read '{}': {}", file, e))?;
+
+        let preserved = self
+            .preserved_sections
+            .get(file)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
+        let merged = merge_user_sections(&generated, preserved, begin_marker, end_marker);
+
+        if merged != generated {
+            std::fs::write(&canonical_path, &merged)?;
+            log::info!(
+                "preserve_sections: merged {} section(s) into '{}'",
+                preserved.len(),
+                file
+            );
+        } else {
+            log::debug!("preserve_sections: no change to '{}'", file);
+        }
+        Ok(())
     }
 
     fn replace_in_file(&self, file: &str, patterns: &[ReplacePattern]) -> anyhow::Result<()> {
@@ -59,6 +141,49 @@ impl PostProcessor {
         log::info!("replace: applied {} pattern(s) to {}", patterns.len(), file);
         Ok(())
     }
+}
+
+fn extract_user_sections(content: &str, begin: &str, end: &str) -> Vec<String> {
+    let mut sections = Vec::new();
+    let mut search_from = 0;
+    while let Some(begin_pos) = content[search_from..].find(begin) {
+        let begin_abs = search_from + begin_pos;
+        let after_begin = begin_abs + begin.len();
+        if let Some(end_pos) = content[after_begin..].find(end) {
+            let end_abs = after_begin + end_pos;
+            sections.push(content[after_begin..end_abs].to_string());
+            search_from = end_abs + end.len();
+        } else {
+            break;
+        }
+    }
+    sections
+}
+
+fn merge_user_sections(generated: &str, preserved: &[String], begin: &str, end: &str) -> String {
+    let mut result = String::new();
+    let mut search_from = 0;
+    let mut section_index = 0;
+
+    while let Some(begin_pos) = generated[search_from..].find(begin) {
+        let begin_abs = search_from + begin_pos;
+        let after_begin = begin_abs + begin.len();
+        result.push_str(&generated[search_from..after_begin]);
+
+        if let Some(end_pos) = generated[after_begin..].find(end) {
+            let end_abs = after_begin + end_pos;
+            if let Some(preserved_content) = preserved.get(section_index) {
+                result.push_str(preserved_content);
+            }
+            search_from = end_abs;
+            section_index += 1;
+        } else {
+            result.push_str(&generated[after_begin..]);
+            return result;
+        }
+    }
+    result.push_str(&generated[search_from..]);
+    result
 }
 
 #[cfg(test)]
@@ -164,15 +289,149 @@ mod tests {
     }
 
     #[test]
-    fn test_preserve_sections_not_implemented() {
+    fn test_extract_user_sections_single() {
+        let content = "template\n# BEGIN\nuser stuff\n# END\nmore template";
+        let sections = extract_user_sections(content, "# BEGIN\n", "# END\n");
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0], "user stuff\n");
+    }
+
+    #[test]
+    fn test_extract_user_sections_multiple() {
+        let content = "t1\n# B\nu1\n# E\nt2\n# B\nu2\n# E\nt3";
+        let sections = extract_user_sections(content, "# B\n", "# E\n");
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0], "u1\n");
+        assert_eq!(sections[1], "u2\n");
+    }
+
+    #[test]
+    fn test_extract_user_sections_no_markers() {
+        let content = "just template content";
+        let sections = extract_user_sections(content, "# BEGIN", "# END");
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn test_extract_user_sections_unmatched_begin() {
+        let content = "template\n# BEGIN\nuser\nno end marker";
+        let sections = extract_user_sections(content, "# BEGIN\n", "# END\n");
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn test_merge_preserves_user_sections() {
+        let generated = "new template\n# B\n# E\nmore template";
+        let preserved = vec!["user content\n".to_string()];
+        let result = merge_user_sections(generated, &preserved, "# B\n", "# E\n");
+        assert_eq!(
+            result,
+            "new template\n# B\nuser content\n# E\nmore template"
+        );
+    }
+
+    #[test]
+    fn test_merge_multiple_sections() {
+        let generated = "t1\n# B\n# E\nt2\n# B\n# E\nt3";
+        let preserved = vec!["u1\n".to_string(), "u2\n".to_string()];
+        let result = merge_user_sections(generated, &preserved, "# B\n", "# E\n");
+        assert_eq!(result, "t1\n# B\nu1\n# E\nt2\n# B\nu2\n# E\nt3");
+    }
+
+    #[test]
+    fn test_merge_no_preserved_sections_first_generation() {
+        let generated = "new template\n# B\ndefault\n# E\nmore";
+        let preserved = &[];
+        let result = merge_user_sections(generated, preserved, "# B\n", "# E\n");
+        assert_eq!(result, "new template\n# B\n# E\nmore");
+    }
+
+    #[test]
+    fn test_merge_extra_old_sections_discarded() {
+        let generated = "t1\n# B\n# E\nt2";
+        let preserved = vec!["u1\n".to_string(), "u2\n".to_string()];
+        let result = merge_user_sections(generated, &preserved, "# B\n", "# E\n");
+        assert_eq!(result, "t1\n# B\nu1\n# E\nt2");
+    }
+
+    #[test]
+    fn test_preserve_sections_first_run_noop() {
         use crate::config::PostProcessStep;
         let dir = tempdir().unwrap();
-        let steps = vec![PostProcessStep::PreserveSections {
+        fs::write(dir.path().join("f.txt"), "template\n# BEGIN\n# END\nmore").unwrap();
+        let proc = processor(dir.path());
+        proc.execute(&[PostProcessStep::PreserveSections {
             file: "f.txt".into(),
-            marker: "---".into(),
-        }];
-        let result = processor(dir.path()).execute(&steps);
+            begin_marker: "# BEGIN\n".into(),
+            end_marker: "# END\n".into(),
+        }])
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "template\n# BEGIN\n# END\nmore"
+        );
+    }
+
+    #[test]
+    fn test_preserve_sections_restores_on_regen() {
+        use crate::config::PostProcessStep;
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("f.txt"), "old\n# BEGIN\nuser\n# END\nold2").unwrap();
+
+        let mut proc = processor(dir.path());
+        proc.snapshot_preserved_sections(&[PostProcessStep::PreserveSections {
+            file: "f.txt".into(),
+            begin_marker: "# BEGIN\n".into(),
+            end_marker: "# END\n".into(),
+        }]);
+
+        fs::write(dir.path().join("f.txt"), "new\n# BEGIN\n# END\nnew2").unwrap();
+
+        proc.execute(&[PostProcessStep::PreserveSections {
+            file: "f.txt".into(),
+            begin_marker: "# BEGIN\n".into(),
+            end_marker: "# END\n".into(),
+        }])
+        .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "new\n# BEGIN\nuser\n# END\nnew2"
+        );
+    }
+
+    #[test]
+    fn test_preserve_sections_dotdot_rejected() {
+        use crate::config::PostProcessStep;
+        let dir = tempdir().unwrap();
+        let mut proc = processor(dir.path());
+        proc.preserved_sections
+            .insert("../escape.txt".into(), vec!["\nuser\n".into()]);
+
+        let result = proc.execute(&[PostProcessStep::PreserveSections {
+            file: "../escape.txt".into(),
+            begin_marker: "# B".into(),
+            end_marker: "# E".into(),
+        }]);
         assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("non-traversing"));
+    }
+
+    #[test]
+    fn test_preserve_sections_absolute_rejected() {
+        use crate::config::PostProcessStep;
+        let dir = tempdir().unwrap();
+        let mut proc = processor(dir.path());
+        proc.preserved_sections
+            .insert("/etc/passwd".into(), vec!["\nuser\n".into()]);
+
+        let result = proc.execute(&[PostProcessStep::PreserveSections {
+            file: "/etc/passwd".into(),
+            begin_marker: "# B".into(),
+            end_marker: "# E".into(),
+        }]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("non-traversing"));
     }
 
     #[test]

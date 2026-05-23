@@ -1,0 +1,13 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+requires-python = ">={{ python_version }}"
+authors = [{ name = "{{ author }}" }]
+
+[project.optional-dependencies]
+# [preserve:begin]
+# [preserve:end]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

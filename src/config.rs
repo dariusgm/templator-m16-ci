@@ -43,7 +43,11 @@ pub struct SavedAnswers {
 #[serde(tag = "type")]
 pub enum PostProcessStep {
     #[serde(rename = "preserve_sections")]
-    PreserveSections { file: String, marker: String },
+    PreserveSections {
+        file: String,
+        begin_marker: String,
+        end_marker: String,
+    },
     #[serde(rename = "replace")]
     Replace {
         file: String,

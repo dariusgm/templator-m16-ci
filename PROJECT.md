@@ -108,3 +108,13 @@ Demonstrates using `pre_processing` Exclude steps alongside `config.exclude` to 
 | `examples/pre-processing-example/template/temp/scratch.txt` | Temp file excluded by pre_processing Exclude (temp/). |
 | `examples/pre-processing-example/template/debug.log` | Log file excluded by pre_processing Exclude (*.log). |
 | `examples/pre-processing-example/template/main.py.draft` | Draft file excluded by config.exclude (*.draft). |
+
+### `preserve-sections-example` — Preserve Sections Across Regenerations
+
+Demonstrates the `preserve_sections` post-processing step for protecting user-edited sections when templates are regenerated. Supports marking sections with begin/end markers so user content survives template updates.
+
+| File | Purpose |
+|---|---|
+| `examples/preserve-sections-example/templator.json` | Config with `preserve_sections` step targeting `pyproject.toml` with `# [preserve:begin]` and `# [preserve:end]` markers. |
+| `examples/preserve-sections-example/template/pyproject.toml.template` | Python project metadata template with user-controlled section marked between begin/end markers for custom dependencies or settings. |
+| `examples/preserve-sections-example-answers.json` | Example answers file with project name, Python version, and author. |
