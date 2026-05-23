@@ -25,8 +25,6 @@ pub enum PostProcessStep {
         file: String,
         patterns: Vec<ReplacePattern>,
     },
-    #[serde(rename = "run_command")]
-    RunCommand { command: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -100,20 +98,6 @@ mod tests {
                 assert_eq!(patterns[0].to, "bar");
             }
             _ => panic!("Expected Replace step"),
-        }
-    }
-
-    #[test]
-    fn test_parse_run_command_post_processing() {
-        let json = r#"{
-            "name": "test",
-            "variables": {},
-            "post_processing": [{"type": "run_command", "command": "echo hello"}]
-        }"#;
-        let config: Config = serde_json::from_str(json).unwrap();
-        match &config.post_processing[0] {
-            PostProcessStep::RunCommand { command } => assert_eq!(command, "echo hello"),
-            _ => panic!("Expected RunCommand step"),
         }
     }
 

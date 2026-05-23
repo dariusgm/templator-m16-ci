@@ -17,10 +17,10 @@
 |---|---|
 | `src/main.rs` | CLI entry point using clap to parse `--template`, `--config`, and `--output` arguments; orchestrates template generation and post-processing. |
 | `src/lib.rs` | Library root that exports the public API: `Config`, `TemplateEngine`, and `PostProcessor`. |
-| `src/config.rs` | Serde structs for deserializing `templator.json`: `Config` (name, variables, exclude, pre_processing, post_processing), `PreProcessStep` enum (Exclude), and `PostProcessStep` enum (Replace, RunCommand, PreserveSections). |
+| `src/config.rs` | Serde structs for deserializing `templator.json`: `Config` (name, variables, exclude, pre_processing, post_processing), `PreProcessStep` enum (Exclude), and `PostProcessStep` enum (Replace, PreserveSections). |
 | `src/engine.rs` | Core template processing: walks the template directory, applies `__var__` substitution to filenames, and renders `.template` files via Tera with variable context. |
 | `src/pre_process.rs` | Pre-generation phase: `PreProcessor::effective_exclude` merges `config.exclude` with patterns from `pre_processing` Exclude steps to produce the list fed to the engine's path filter. |
-| `src/post_process.rs` | Post-generation steps: `replace` for literal string substitution and `run_command` to execute shell commands, with path traversal and symlink escape protection. |
+| `src/post_process.rs` | Post-generation steps: `replace` for literal string substitution and `preserve_sections` for section preservation, with path traversal and symlink escape protection. |
 
 ## Tests
 
@@ -53,28 +53,17 @@ Demonstrates the `replace` post-processing step for literal string substitution.
 | `examples/basic-template/template/src/__project_name__/main.py.template` | Nested template file demonstrating `__var__` directory renaming and Tera variable injection. |
 | `examples/basic-template/template/.gitignore` | Static file copied verbatim; not rendered. |
 
-### `run-command-example` — RunCommand Post-Processing
-
-Demonstrates the `run_command` post-processing step for executing shell commands (e.g., chmod).
-
-| File | Purpose |
-|---|---|
-| `examples/run-command-example/templator.json` | Config with two `run_command` steps that make generated shell scripts executable via `chmod +x`. |
-| `examples/run-command-example/template/README.md.template` | Documentation template explaining how to use the generated scripts. |
-| `examples/run-command-example/template/scripts/setup.sh` | Shell script template; becomes executable after generation via post-processing. |
-| `examples/run-command-example/template/scripts/deploy.sh` | Shell script template; becomes executable after generation via post-processing. |
-
 ### `full-featured-example` — Multiple Post-Processing Steps
 
-Demonstrates combining multiple post-processing steps (`replace` and `run_command`) in a single template.
+Demonstrates combining multiple post-processing steps in a single template.
 
 | File | Purpose |
 |---|---|
-| `examples/full-featured-example/templator.json` | Config with two `replace` steps (version, author, copyright year) and one `run_command` step (chmod). |
+| `examples/full-featured-example/templator.json` | Config with two `replace` steps (version, author, copyright year). |
 | `examples/full-featured-example/template/Cargo.toml.template` | Rust manifest template with version and author placeholders for post-processing substitution. |
 | `examples/full-featured-example/template/src/lib/mod.rs.template` | Rust library module with copyright year placeholder for post-processing substitution. |
 | `examples/full-featured-example/template/README.md.template` | Documentation template with project name and description variables. |
-| `examples/full-featured-example/template/build.sh` | Shell script template; becomes executable via `run_command` post-processing. |
+| `examples/full-featured-example/template/build.sh` | Shell script template for the Rust project. |
 
 ### `exclude-example` — File Exclusion
 

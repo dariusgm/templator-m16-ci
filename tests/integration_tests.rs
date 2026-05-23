@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use templator::{
-    config::{PostProcessStep, PreProcessStep},
-    Config, PostProcessor, TemplateEngine,
-};
+use templator::{config::PreProcessStep, Config, PostProcessor, TemplateEngine};
 use walkdir::WalkDir;
 
 fn basic_template_dir() -> PathBuf {
@@ -189,25 +186,6 @@ fn test_tera_syntax_error_returns_error() {
         result.is_err(),
         "Invalid Tera syntax should propagate as error"
     );
-}
-
-#[test]
-fn test_run_command_failure_aborts_post_processing() -> anyhow::Result<()> {
-    let config = Config::from_file(&basic_config_file())?;
-    let out = tempfile::tempdir()?;
-
-    TemplateEngine::new().generate(&basic_template_dir(), out.path(), &config)?;
-
-    let steps = vec![PostProcessStep::RunCommand {
-        command: "exit 1".into(),
-    }];
-    let result = PostProcessor::new(out.path().to_path_buf()).execute(&steps);
-    assert!(
-        result.is_err(),
-        "run_command failure should abort post-processing"
-    );
-
-    Ok(())
 }
 
 #[test]

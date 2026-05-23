@@ -21,10 +21,6 @@
       "patterns": [
         { "from": "LICENSE_YEAR", "to": "2026" }
       ]
-    },
-    {
-      "type": "run_command",
-      "command": "chmod +x build.sh"
     }
   ]
 }

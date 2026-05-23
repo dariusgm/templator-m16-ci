@@ -154,15 +154,6 @@ Both mechanisms co-exist. You can use one, the other, or both simultaneously.
 Patterns are applied sequentially: the output of one becomes the input of the next.  
 Paths must be relative and must not contain `..`.
 
-#### `run_command` — run a shell command in the output directory
-
-```json
-{ "type": "run_command", "command": "chmod +x scripts/setup.sh" }
-```
-
-The command runs via `sh -c` with the output directory as the working directory.  
-A non-zero exit code is a hard error.
-
 ## Example template layout
 
 ```

@@ -1,5 +1,4 @@
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 
 use crate::config::{PostProcessStep, ReplacePattern};
 
@@ -20,9 +19,6 @@ impl PostProcessor {
                 }
                 PostProcessStep::Replace { file, patterns } => {
                     self.replace_in_file(file, patterns)?;
-                }
-                PostProcessStep::RunCommand { command } => {
-                    self.run_command(command)?;
                 }
             }
         }
@@ -61,23 +57,6 @@ impl PostProcessor {
         }
         std::fs::write(&canonical_path, content)?;
         log::info!("replace: applied {} pattern(s) to {}", patterns.len(), file);
-        Ok(())
-    }
-
-    fn run_command(&self, command: &str) -> anyhow::Result<()> {
-        log::info!("run_command: {}", command);
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .current_dir(&self.working_dir)
-            .output()
-            .map_err(|e| anyhow::anyhow!("Failed to spawn command '{}': {}", command, e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("Command failed: {}\n{}", command, stderr);
-        }
-        log::info!("run_command: done");
         Ok(())
     }
 }
@@ -197,46 +176,19 @@ mod tests {
     }
 
     #[test]
-    fn test_run_command_success() {
-        let dir = tempdir().unwrap();
-        processor(dir.path()).run_command("true").unwrap();
-    }
-
-    #[test]
-    fn test_run_command_creates_file() {
-        let dir = tempdir().unwrap();
-        processor(dir.path())
-            .run_command("touch created.txt")
-            .unwrap();
-        assert!(dir.path().join("created.txt").exists());
-    }
-
-    #[test]
-    fn test_run_command_failure_errors() {
-        let dir = tempdir().unwrap();
-        let result = processor(dir.path()).run_command("exit 1");
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_execute_multiple_steps() {
         use crate::config::PostProcessStep;
 
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("a.txt"), "__FOO__").unwrap();
 
-        let steps = vec![
-            PostProcessStep::Replace {
-                file: "a.txt".into(),
-                patterns: vec![ReplacePattern {
-                    from: "__FOO__".into(),
-                    to: "replaced".into(),
-                }],
-            },
-            PostProcessStep::RunCommand {
-                command: "touch done.txt".into(),
-            },
-        ];
+        let steps = vec![PostProcessStep::Replace {
+            file: "a.txt".into(),
+            patterns: vec![ReplacePattern {
+                from: "__FOO__".into(),
+                to: "replaced".into(),
+            }],
+        }];
 
         processor(dir.path()).execute(&steps).unwrap();
 
@@ -244,7 +196,6 @@ mod tests {
             fs::read_to_string(dir.path().join("a.txt")).unwrap(),
             "replaced"
         );
-        assert!(dir.path().join("done.txt").exists());
     }
 
     #[test]
@@ -304,18 +255,6 @@ mod tests {
         assert_eq!(
             fs::read_to_string(dir.path().join("sub/dir/file.txt")).unwrap(),
             "value"
-        );
-    }
-
-    #[test]
-    fn test_run_command_error_message_includes_command() {
-        let dir = tempdir().unwrap();
-        let result = processor(dir.path()).run_command("exit 42");
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(
-            msg.contains("exit 42"),
-            "error message should include the failing command, got: {msg}"
         );
     }
 

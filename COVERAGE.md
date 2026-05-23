@@ -46,13 +46,6 @@ All post-processing steps have **100% test coverage**:
 - ✅ Nested subdirectory support
 - ✅ Error messages include command details
 
-### `RunCommand` Post-Processing
-- ✅ Successful command execution
-- ✅ File creation from command
-- ✅ Command failure handling
-- ✅ Stderr capture in error messages
-- ✅ Multiple sequential steps
-
 ### `PreserveSections` Post-Processing
 - ✅ Returns "not implemented" error (placeholder for future feature)
 

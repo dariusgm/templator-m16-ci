@@ -1,6 +1,9 @@
 # Templator — Claude Code Project Guide
 
 Fast, Jinja2-based project template engine written in Rust.
+First lookup files via `PROJECT.md` to get an overview of the project.
+Each file is described here with one or two sentences, explaining the purpose of the files.
+You can then select the files that are relevant to you.
 
 ## Mandatory after every Rust code change
 
@@ -29,7 +32,7 @@ All tests live either in `#[cfg(test)]` blocks inside each source module or in
 |---|---|
 | `src/config.rs` | `Config` + `PostProcessStep` serde structs |
 | `src/engine.rs` | Template walking, `__var__` path substitution, Tera rendering |
-| `src/post_process.rs` | Post-generation steps: `replace`, `run_command` |
+| `src/post_process.rs` | Post-generation steps: `replace`, `preserve_sections` |
 | `src/main.rs` | CLI entry point (clap) |
 | `tests/integration_tests.rs` | End-to-end tests against `examples/basic-template/` |
 
