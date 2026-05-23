@@ -81,6 +81,19 @@ Demonstrates the `exclude` feature to prevent certain files from being copied to
 | `examples/exclude-example/template/build/artifact.o` | Build output in `build/` directory; **excluded** from output. |
 | `examples/exclude-example/template/temp/cache.tmp` | Temporary file matching `**/*.tmp` pattern; **excluded** from output. |
 
+### `git-hooks-example` — Git Hooks with Selective `.git/` Inclusion
+
+Demonstrates including `.git/hooks/` scripts while excluding the rest of the `.git/` directory using selective exclude patterns. Useful for templates that want to provision git hooks (e.g., pre-commit checks) in generated projects.
+
+| File | Purpose |
+|---|---|
+| `examples/git-hooks-example/templator.json` | Config with exclude patterns that keep only `.git/hooks/` (no objects, refs, config, etc.). |
+| `examples/git-hooks-example/template/.git/hooks/pre-commit` | Executable hook that runs `cargo fmt --check` before each commit. |
+| `examples/git-hooks-example/template/.git/hooks/prepare-commit-msg` | Optional hook with example code for prepending issue numbers to commits. |
+| `examples/git-hooks-example/template/README.md.template` | Documentation explaining the included hooks and how to customize them. |
+| `examples/git-hooks-example/template/src/main.rs.template` | Sample Rust source file with author and project name placeholders. |
+| `examples/git-hooks-example/template/.gitignore` | Standard Rust `.gitignore` file. |
+
 ### `pre-processing-example` — Pre-Processing Exclusion
 
 Demonstrates using `pre_processing` Exclude steps alongside `config.exclude` to show that both mechanisms are additive.

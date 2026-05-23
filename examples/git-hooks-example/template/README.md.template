@@ -1,0 +1,36 @@
+# {{ project_name }}
+
+Author: {{ author }}
+
+A Rust project with pre-configured git hooks for code quality.
+
+## Git Hooks
+
+This template includes pre-configured git hooks in `.git/hooks/`:
+
+- **pre-commit** — Runs `cargo fmt --check` before each commit to enforce code formatting
+- **prepare-commit-msg** — (Optional) Can be configured to prepend issue numbers to commit messages
+
+### Enabling Hooks
+
+The hooks are installed and executable by default. They will run automatically on:
+- `git commit` (pre-commit hook)
+- `git commit` (prepare-commit-msg hook)
+
+### Customizing Hooks
+
+Edit the scripts in `.git/hooks/` to add or modify the checks:
+
+```bash
+# Example: add clippy linting to pre-commit
+cargo clippy -- -D warnings
+```
+
+## Template Feature
+
+This example demonstrates how to use templator's selective `.git/` copying:
+- The `templator.json` exclude list keeps only `.git/hooks/`
+- This avoids copying the internal git database (objects, refs, config, etc.)
+- Users can customize the exclude patterns to suit their needs
+
+See `examples/README.md` for more information.

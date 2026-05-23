@@ -1,0 +1,16 @@
+/// {{ project_name }}
+/// Author: {{ author }}
+
+fn main() {
+    println!("Welcome to {{ project_name }}!");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}

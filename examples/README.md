@@ -1,6 +1,17 @@
 # Templator Examples
 
-This directory contains example templates demonstrating templator's features and post-processing capabilities.
+This directory contains example templates demonstrating templator's features.
+
+## Running Examples
+
+All examples use the same CLI pattern:
+
+```bash
+templator \
+  --template examples/<example-name> \
+  --answers examples/<example-name>-answers.json \
+  --output /tmp/<output-dir>
+```
 
 ## Examples by Post-Processing Type
 
@@ -17,8 +28,8 @@ Demonstrates the `replace` post-processing step for literal string substitution.
 **Run:**
 ```bash
 templator \
-  --template examples/basic-template/template \
-  --config examples/basic-template/templator.json \
+  --template examples/basic-template \
+  --answers examples/basic-answers.json \
   --output /tmp/my-python-project
 ```
 
@@ -41,8 +52,8 @@ Demonstrates combining multiple post-processing types in a single template.
 **Run:**
 ```bash
 templator \
-  --template examples/full-featured-example/template \
-  --config examples/full-featured-example/templator.json \
+  --template examples/full-featured-example \
+  --answers examples/basic-answers.json \
   --output /tmp/my-rust-lib
 ```
 
@@ -67,8 +78,8 @@ Demonstrates the `exclude` feature to prevent certain files from being copied to
 **Run:**
 ```bash
 templator \
-  --template examples/exclude-example/template \
-  --config examples/exclude-example/templator.json \
+  --template examples/exclude-example \
+  --answers examples/basic-answers.json \
   --output /tmp/project-with-exclusions
 ```
 
@@ -87,6 +98,48 @@ templator \
 - `**/*.ext` — exclude files with extension at any depth
 
 **Use case:** Remove sensitive files, build artifacts, drafts, and temporary files from generated projects.
+
+---
+
+### 4. `git-hooks-example` — Git Hooks via Selective `.git/` Inclusion
+
+Demonstrates how to include git hooks (`.git/hooks/`) while excluding the rest of the `.git/` directory using selective exclude patterns.
+
+**Features:**
+- Rust project template with pre-commit hook for code formatting
+- Pre-commit hook runs `cargo fmt --check` on every commit
+- Optional prepare-commit-msg hook (with example configuration)
+- Uses exclude patterns to keep only `.git/hooks/` (no objects, refs, config)
+
+**Run:**
+```bash
+templator \
+  --template examples/git-hooks-example \
+  --answers examples/git-hooks-example-answers.json \
+  --output /tmp/rust-with-hooks
+```
+
+**What happens:**
+1. Template files are rendered with project name and author
+2. `.git/hooks/pre-commit` and `.git/hooks/prepare-commit-msg` are copied (executable)
+3. All other `.git/` internals are excluded (objects/, refs/, config, HEAD, etc.)
+4. Generated project has working git hooks ready to use
+
+**Exclude patterns used:**
+```json
+"exclude": [
+  ".git/objects/",
+  ".git/refs/",
+  ".git/logs/",
+  ".git/config",
+  ".git/HEAD",
+  ".git/description"
+]
+```
+
+This keeps only the hooks directory while excluding the git database.
+
+**Use case:** Create templates that ship pre-configured development tooling (linters, formatters, code quality checks) via git hooks.
 
 ---
 
@@ -165,21 +218,30 @@ To verify all examples work correctly:
 ```bash
 # Test basic-template
 cargo run -- \
-  --template examples/basic-template/template \
-  --config examples/basic-template/templator.json \
+  --template examples/basic-template \
+  --answers examples/basic-answers.json \
   --output /tmp/test-basic
 
 # Test full-featured-example
 cargo run -- \
-  --template examples/full-featured-example/template \
-  --config examples/full-featured-example/templator.json \
+  --template examples/full-featured-example \
+  --answers examples/basic-answers.json \
   --output /tmp/test-full-featured
 
 # Test exclude-example
 cargo run -- \
-  --template examples/exclude-example/template \
-  --config examples/exclude-example/templator.json \
+  --template examples/exclude-example \
+  --answers examples/basic-answers.json \
   --output /tmp/test-exclude
+
+# Test git-hooks-example
+cargo run -- \
+  --template examples/git-hooks-example \
+  --answers examples/git-hooks-example-answers.json \
+  --output /tmp/test-hooks
+
+# Verify git hooks were copied and are executable
+ls -la /tmp/test-hooks/.git/hooks/
 ```
 
 Each example exercises different aspects of templator's functionality and can serve as a reference for your own templates.
