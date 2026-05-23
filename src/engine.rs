@@ -55,11 +55,6 @@ impl TemplateEngine {
                 continue;
             }
 
-            // Skip .git directories
-            if rel_path.components().any(|c| c.as_os_str() == ".git") {
-                continue;
-            }
-
             // Skip excluded paths
             if is_excluded(rel_path, &effective_exclude) {
                 log::debug!("Excluded: {}", rel_path.display());
@@ -576,13 +571,13 @@ mod tests {
     // --- generate: .git directories are skipped ---
 
     #[test]
-    fn test_generate_skips_dot_git_directory() {
+    fn test_generate_includes_git_hooks_when_not_excluded() {
         let template_dir = tempdir().unwrap();
         let output_dir = tempdir().unwrap();
 
-        let git_dir = template_dir.path().join(".git");
-        fs::create_dir_all(&git_dir).unwrap();
-        fs::write(git_dir.join("config"), "[core]\nbare = false").unwrap();
+        let git_hooks_dir = template_dir.path().join(".git/hooks");
+        fs::create_dir_all(&git_hooks_dir).unwrap();
+        fs::write(git_hooks_dir.join("pre-commit"), "#!/bin/sh\necho ok").unwrap();
         fs::write(template_dir.path().join("README.md"), "hello").unwrap();
 
         let config = make_config();
@@ -593,8 +588,32 @@ mod tests {
 
         assert!(output_dir.path().join("README.md").exists());
         assert!(
+            output_dir.path().join(".git/hooks/pre-commit").exists(),
+            ".git/hooks should be copied when not excluded"
+        );
+    }
+
+    #[test]
+    fn test_generate_excludes_dot_git_when_excluded() {
+        let template_dir = tempdir().unwrap();
+        let output_dir = tempdir().unwrap();
+
+        let git_dir = template_dir.path().join(".git");
+        fs::create_dir_all(&git_dir).unwrap();
+        fs::write(git_dir.join("config"), "[core]\nbare = false").unwrap();
+        fs::write(template_dir.path().join("README.md"), "hello").unwrap();
+
+        let mut config = make_config();
+        config.exclude = vec![".git/".to_string()];
+        let vars = make_variables(&[]);
+        TemplateEngine::new()
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
+            .unwrap();
+
+        assert!(output_dir.path().join("README.md").exists());
+        assert!(
             !output_dir.path().join(".git").exists(),
-            ".git dir should not appear in output"
+            ".git dir should be excluded when matched"
         );
     }
 
