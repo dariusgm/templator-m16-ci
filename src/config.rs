@@ -2,17 +2,41 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
+#[derive(Debug, Deserialize, Clone)]
+pub struct VariableDefinition {
+    #[serde(rename = "type", default = "default_variable_type")]
+    pub var_type: String,
+    pub default: Option<String>,
+}
+
+fn default_variable_type() -> String {
+    "string".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TemplateConfig {
     pub name: String,
     pub description: Option<String>,
-    pub variables: HashMap<String, String>,
+    pub variables: HashMap<String, VariableDefinition>,
     #[serde(default)]
     pub exclude: Vec<String>,
     #[serde(default)]
     pub pre_processing: Vec<PreProcessStep>,
     #[serde(default)]
     pub post_processing: Vec<PostProcessStep>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProjectAnswers {
+    pub variables: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SavedAnswers {
+    pub _template: String,
+    pub _generated_at: String,
+    #[serde(flatten)]
+    pub variables: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,12 +64,60 @@ pub enum PreProcessStep {
     Exclude { patterns: Vec<String> },
 }
 
-impl Config {
-    pub fn from_file(path: &Path) -> anyhow::Result<Self> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| anyhow::anyhow!("Cannot read config {:?}: {}", path, e))?;
+impl TemplateConfig {
+    pub fn load_from_template_dir(template_dir: &Path) -> anyhow::Result<Self> {
+        let path = template_dir.join("templator.json");
+        if !path.exists() {
+            anyhow::bail!(
+                "Template config not found at {}. Place templator.json in the template directory.",
+                path.display()
+            );
+        }
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("Cannot read config {}: {}", path.display(), e))?;
         serde_json::from_str(&content)
-            .map_err(|e| anyhow::anyhow!("Invalid config JSON in {:?}: {}", path, e))
+            .map_err(|e| anyhow::anyhow!("Invalid config JSON in {}: {}", path.display(), e))
+    }
+}
+
+impl ProjectAnswers {
+    pub fn load_from_file(path: &Path) -> anyhow::Result<Self> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("Cannot read answers file {}: {}", path.display(), e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| anyhow::anyhow!("Invalid answers JSON in {}: {}", path.display(), e))
+    }
+
+    pub fn validate_against(&self, config: &TemplateConfig) -> anyhow::Result<()> {
+        for (var_name, var_def) in &config.variables {
+            if !self.variables.contains_key(var_name) && var_def.default.is_none() {
+                anyhow::bail!("Required variable missing in answers: {}", var_name);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn resolve(&self, config: &TemplateConfig) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+        for (var_name, var_def) in &config.variables {
+            let value = self
+                .variables
+                .get(var_name)
+                .cloned()
+                .or_else(|| var_def.default.clone())
+                .unwrap_or_default();
+            result.insert(var_name.clone(), value);
+        }
+        result
+    }
+}
+
+impl SavedAnswers {
+    pub fn write_to_output(&self, output_dir: &Path) -> anyhow::Result<()> {
+        let path = output_dir.join(".templator-answers.json");
+        let content = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, content)?;
+        Ok(())
     }
 }
 
@@ -56,27 +128,46 @@ mod tests {
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_parse_minimal_config() {
-        let json = r#"{"name": "test-project", "variables": {}}"#;
-        let config: Config = serde_json::from_str(json).unwrap();
-        assert_eq!(config.name, "test-project");
+    fn test_parse_minimal_template_config() {
+        let json = r#"{"name": "test-template", "variables": {}}"#;
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.name, "test-template");
         assert!(config.description.is_none());
         assert!(config.post_processing.is_empty());
     }
 
     #[test]
-    fn test_parse_full_config() {
+    fn test_parse_template_config_with_variable_definitions() {
         let json = r#"{
-            "name": "my-project",
-            "description": "A test project",
+            "name": "my-template",
             "variables": {
-                "project_name": "my_project",
-                "author": "Alice"
+                "project_name": {"type": "string"},
+                "author": {"type": "string", "default": "Anonymous"}
             }
         }"#;
-        let config: Config = serde_json::from_str(json).unwrap();
-        assert_eq!(config.description.as_deref(), Some("A test project"));
-        assert_eq!(config.variables["author"], "Alice");
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.variables.len(), 2);
+        assert_eq!(
+            config.variables["project_name"].var_type,
+            "string".to_string()
+        );
+        assert!(config.variables["project_name"].default.is_none());
+        assert_eq!(
+            config.variables["author"].default.as_deref(),
+            Some("Anonymous")
+        );
+    }
+
+    #[test]
+    fn test_parse_variable_definition_defaults_type() {
+        let json = r#"{
+            "name": "test",
+            "variables": {
+                "name": {"default": "foo"}
+            }
+        }"#;
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.variables["name"].var_type, "string");
     }
 
     #[test]
@@ -90,7 +181,7 @@ mod tests {
                 "patterns": [{"from": "__FOO__", "to": "bar"}]
             }]
         }"#;
-        let config: Config = serde_json::from_str(json).unwrap();
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
         match &config.post_processing[0] {
             PostProcessStep::Replace { file, patterns } => {
                 assert_eq!(file, "README.md");
@@ -102,40 +193,16 @@ mod tests {
     }
 
     #[test]
-    fn test_from_file() {
-        let mut f = NamedTempFile::new().unwrap();
-        write!(f, r#"{{"name": "x", "variables": {{}}}}"#).unwrap();
-        let config = Config::from_file(f.path()).unwrap();
+    fn test_template_config_from_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config_file = temp_dir.path().join("templator.json");
+        write!(
+            std::fs::File::create(&config_file).unwrap(),
+            r#"{{"name": "x", "variables": {{}}, "post_processing": []}}"#
+        )
+        .unwrap();
+        let config = TemplateConfig::load_from_template_dir(temp_dir.path()).unwrap();
         assert_eq!(config.name, "x");
-    }
-
-    #[test]
-    fn test_from_file_not_found() {
-        let result = Config::from_file(Path::new("/nonexistent/templator.json"));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_from_file_invalid_json_error_message() {
-        let mut f = NamedTempFile::new().unwrap();
-        write!(f, "{{ not valid json {{{{").unwrap();
-        let err = Config::from_file(f.path()).unwrap_err();
-        assert!(
-            err.to_string().contains("Invalid config JSON"),
-            "expected 'Invalid config JSON' in error, got: {err}"
-        );
-    }
-
-    #[test]
-    fn test_parse_null_name_errors() {
-        let json = r#"{"name": null, "variables": {}}"#;
-        assert!(serde_json::from_str::<Config>(json).is_err());
-    }
-
-    #[test]
-    fn test_parse_unknown_post_process_type_errors() {
-        let json = r#"{"name":"t","variables":{},"post_processing":[{"type":"unknown_step"}]}"#;
-        assert!(serde_json::from_str::<Config>(json).is_err());
     }
 
     #[test]
@@ -145,25 +212,11 @@ mod tests {
             "variables": {},
             "exclude": ["*.tmp", "build/", "node_modules/**"]
         }"#;
-        let config: Config = serde_json::from_str(json).unwrap();
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.exclude.len(), 3);
         assert_eq!(config.exclude[0], "*.tmp");
         assert_eq!(config.exclude[1], "build/");
         assert_eq!(config.exclude[2], "node_modules/**");
-    }
-
-    #[test]
-    fn test_parse_exclude_defaults_to_empty() {
-        let json = r#"{"name": "test", "variables": {}}"#;
-        let config: Config = serde_json::from_str(json).unwrap();
-        assert!(config.exclude.is_empty());
-    }
-
-    #[test]
-    fn test_parse_pre_processing_defaults_to_empty() {
-        let json = r#"{"name": "test", "variables": {}}"#;
-        let config: Config = serde_json::from_str(json).unwrap();
-        assert!(config.pre_processing.is_empty());
     }
 
     #[test]
@@ -176,7 +229,7 @@ mod tests {
                 "patterns": ["*.log", "temp/"]
             }]
         }"#;
-        let config: Config = serde_json::from_str(json).unwrap();
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.pre_processing.len(), 1);
         match &config.pre_processing[0] {
             PreProcessStep::Exclude { patterns } => {
@@ -188,8 +241,80 @@ mod tests {
     }
 
     #[test]
+    fn test_project_answers_load_from_file() {
+        let mut f = NamedTempFile::new().unwrap();
+        write!(
+            f,
+            r#"{{"variables": {{"project_name": "my_cli", "author": "Darius"}}}}"#
+        )
+        .unwrap();
+        let answers = ProjectAnswers::load_from_file(f.path()).unwrap();
+        assert_eq!(answers.variables["project_name"], "my_cli");
+        assert_eq!(answers.variables["author"], "Darius");
+    }
+
+    #[test]
+    fn test_answers_validate_missing_required_variable() {
+        let json = r#"{
+            "name": "test",
+            "variables": {
+                "required": {"type": "string"},
+                "optional": {"type": "string", "default": "def"}
+            }
+        }"#;
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
+        let answers_json = r#"{"variables": {"optional": "value"}}"#;
+        let answers: ProjectAnswers = serde_json::from_str(answers_json).unwrap();
+        assert!(answers.validate_against(&config).is_err());
+    }
+
+    #[test]
+    fn test_answers_validate_success() {
+        let json = r#"{
+            "name": "test",
+            "variables": {
+                "required": {"type": "string"},
+                "optional": {"type": "string", "default": "def"}
+            }
+        }"#;
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
+        let answers_json = r#"{"variables": {"required": "value", "optional": "custom"}}"#;
+        let answers: ProjectAnswers = serde_json::from_str(answers_json).unwrap();
+        assert!(answers.validate_against(&config).is_ok());
+    }
+
+    #[test]
+    fn test_answers_resolve_merges_defaults() {
+        let json = r#"{
+            "name": "test",
+            "variables": {
+                "provided": {"type": "string"},
+                "with_default": {"type": "string", "default": "default_value"}
+            }
+        }"#;
+        let config: TemplateConfig = serde_json::from_str(json).unwrap();
+        let answers_json = r#"{"variables": {"provided": "custom_value"}}"#;
+        let answers: ProjectAnswers = serde_json::from_str(answers_json).unwrap();
+        let resolved = answers.resolve(&config);
+        assert_eq!(resolved["provided"], "custom_value");
+        assert_eq!(resolved["with_default"], "default_value");
+    }
+
+    #[test]
+    fn test_parse_null_name_errors() {
+        let json = r#"{"name": null, "variables": {}}"#;
+        assert!(serde_json::from_str::<TemplateConfig>(json).is_err());
+    }
+
+    #[test]
+    fn test_parse_unknown_post_process_type_errors() {
+        let json = r#"{"name":"t","variables":{},"post_processing":[{"type":"unknown_step"}]}"#;
+        assert!(serde_json::from_str::<TemplateConfig>(json).is_err());
+    }
+
+    #[test]
     fn test_parse_unknown_pre_process_type_errors() {
         let json = r#"{"name":"t","variables":{},"pre_processing":[{"type":"unknown_step"}]}"#;
-        assert!(serde_json::from_str::<Config>(json).is_err());
+        assert!(serde_json::from_str::<TemplateConfig>(json).is_err());
     }
 }

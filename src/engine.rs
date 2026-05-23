@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
 
-use crate::config::Config;
+use crate::config::TemplateConfig;
 use crate::pre_process::PreProcessor;
 
 pub struct TemplateEngine;
@@ -16,7 +16,8 @@ impl TemplateEngine {
         &self,
         template_dir: &Path,
         output_dir: &Path,
-        config: &Config,
+        config: &TemplateConfig,
+        variables: &HashMap<String, String>,
     ) -> anyhow::Result<()> {
         std::fs::create_dir_all(output_dir)?;
 
@@ -27,7 +28,7 @@ impl TemplateEngine {
             context.insert("description", desc);
         }
         // Variables override config fields if names collide
-        for (key, value) in &config.variables {
+        for (key, value) in variables {
             context.insert(key, value);
         }
 
@@ -66,7 +67,7 @@ impl TemplateEngine {
             }
 
             // Apply __var__ substitution to path components, then strip .template suffix
-            let substituted = substitute_path(rel_path, &config.variables);
+            let substituted = substitute_path(rel_path, variables);
 
             // Reject variable values that would escape the output directory
             if substituted.components().any(|c| {
@@ -222,18 +223,21 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    fn make_config(vars: &[(&str, &str)]) -> Config {
-        Config {
+    fn make_config() -> TemplateConfig {
+        TemplateConfig {
             name: "test".into(),
             description: None,
-            variables: vars
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
+            variables: HashMap::new(),
             exclude: vec![],
             pre_processing: vec![],
             post_processing: vec![],
         }
+    }
+
+    fn make_variables(vars: &[(&str, &str)]) -> HashMap<String, String> {
+        vars.iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     // --- has_template_suffix ---
@@ -351,9 +355,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = make_config(&[("name", "World")]);
+        let config = make_config();
+        let vars = make_variables(&[("name", "World")]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert_eq!(
@@ -373,9 +378,10 @@ mod tests {
         let raw = "{{ not_rendered }}\n__neither__\n";
         fs::write(template_dir.path().join("verbatim.txt"), raw).unwrap();
 
-        let config = make_config(&[]);
+        let config = make_config();
+        let vars = make_variables(&[]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         let out = fs::read_to_string(output_dir.path().join("verbatim.txt")).unwrap();
@@ -393,9 +399,10 @@ mod tests {
         fs::create_dir_all(&src).unwrap();
         fs::write(src.join("main.py.template"), "# {{ project_name }}").unwrap();
 
-        let config = make_config(&[("project_name", "my_app")]);
+        let config = make_config();
+        let vars = make_variables(&[("project_name", "my_app")]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         let expected = output_dir.path().join("src").join("my_app").join("main.py");
@@ -416,11 +423,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut config = make_config(&[]);
+        let mut config = make_config();
+        let vars = make_variables(&[]);
         config.description = Some("A great tool".into());
 
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         let out = fs::read_to_string(output_dir.path().join("README.md")).unwrap();
@@ -449,9 +457,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = make_config(&[("val", "ok")]);
+        let config = make_config();
+        let vars = make_variables(&[("val", "ok")]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         let output_file = output_dir.path().join("out.txt.template");
@@ -471,9 +480,10 @@ mod tests {
         fs::create_dir_all(&src).unwrap();
         fs::write(src.join("file.txt"), "content").unwrap();
 
-        let config = make_config(&[("unsafe", "../../escaped")]);
+        let config = make_config();
+        let vars = make_variables(&[("unsafe", "../../escaped")]);
         let result =
-            TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config);
+            TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config, &vars);
         assert!(
             result.is_err(),
             "Expected error for path traversal via variable"
@@ -490,9 +500,10 @@ mod tests {
         fs::create_dir_all(&src).unwrap();
         fs::write(src.join("main.py.template"), "# {{ pkg }}").unwrap();
 
-        let config = make_config(&[("pkg", "myorg/myapp")]);
+        let config = make_config();
+        let vars = make_variables(&[("pkg", "myorg/myapp")]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         let expected = output_dir.path().join("src/myorg/myapp/main.py");
@@ -535,9 +546,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = make_config(&[]);
+        let config = make_config();
+        let vars = make_variables(&[]);
         let result =
-            TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config);
+            TemplateEngine::new().generate(template_dir.path(), output_dir.path(), &config, &vars);
         assert!(result.is_err(), "Invalid Tera syntax should return error");
     }
 
@@ -548,9 +560,10 @@ mod tests {
         let template_dir = tempdir().unwrap();
         let output_dir = tempdir().unwrap();
 
-        let config = make_config(&[]);
+        let config = make_config();
+        let vars = make_variables(&[]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         let entries: Vec<_> = fs::read_dir(output_dir.path()).unwrap().collect();
@@ -572,9 +585,10 @@ mod tests {
         fs::write(git_dir.join("config"), "[core]\nbare = false").unwrap();
         fs::write(template_dir.path().join("README.md"), "hello").unwrap();
 
-        let config = make_config(&[]);
+        let config = make_config();
+        let vars = make_variables(&[]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert!(output_dir.path().join("README.md").exists());
@@ -594,9 +608,10 @@ mod tests {
         fs::write(template_dir.path().join("out.txt.template"), "{{ name }}").unwrap();
 
         // config.name = "test" (from make_config), variables["name"] = "overridden"
-        let config = make_config(&[("name", "overridden")]);
+        let config = make_config();
+        let vars = make_variables(&[("name", "overridden")]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert_eq!(
@@ -616,9 +631,10 @@ mod tests {
         fs::create_dir_all(&subdir).unwrap();
         fs::write(subdir.join("logo.png"), "binary").unwrap();
 
-        let config = make_config(&[]);
+        let config = make_config();
+        let vars = make_variables(&[]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert!(
@@ -642,9 +658,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = make_config(&[]);
+        let config = make_config();
+        let vars = make_variables(&[]);
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert_eq!(
@@ -726,11 +743,12 @@ mod tests {
         fs::write(template_dir.path().join("keep.txt"), "keep").unwrap();
         fs::write(template_dir.path().join("skip.tmp"), "skip").unwrap();
 
-        let mut config = make_config(&[]);
+        let mut config = make_config();
+        let vars = make_variables(&[]);
         config.exclude = vec!["*.tmp".to_string()];
 
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert!(
@@ -754,11 +772,12 @@ mod tests {
         fs::write(template_dir.path().join("src/main.rs"), "code").unwrap();
         fs::write(template_dir.path().join("build/artifact"), "binary").unwrap();
 
-        let mut config = make_config(&[]);
+        let mut config = make_config();
+        let vars = make_variables(&[]);
         config.exclude = vec!["build/".to_string()];
 
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert!(output_dir.path().join("src").exists(), "src/ should exist");
@@ -787,11 +806,12 @@ mod tests {
         .unwrap();
         fs::write(template_dir.path().join("src/main.js"), "code").unwrap();
 
-        let mut config = make_config(&[]);
+        let mut config = make_config();
+        let vars = make_variables(&[]);
         config.exclude = vec!["node_modules/".to_string()];
 
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert!(
@@ -820,11 +840,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut config = make_config(&[("value", "test")]);
+        let mut config = make_config();
+        let vars = make_variables(&[("value", "test")]);
         config.exclude = vec!["config.template".to_string()];
 
         TemplateEngine::new()
-            .generate(template_dir.path(), output_dir.path(), &config)
+            .generate(template_dir.path(), output_dir.path(), &config, &vars)
             .unwrap();
 
         assert!(

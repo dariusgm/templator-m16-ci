@@ -2,17 +2,17 @@
   "name": "my-python-project",
   "description": "A Python project template",
   "variables": {
-    "project_name": "my_project",
-    "python_version": "3.12",
-    "python_version_short": "py312",
-    "author": "Darius"
+    "project_name": { "type": "string" },
+    "python_version": { "type": "string", "default": "3.12" },
+    "python_version_short": { "type": "string", "default": "py312" },
+    "author": { "type": "string", "default": "Anonymous" }
   },
   "post_processing": [
     {
       "type": "replace",
       "file": "pyproject.toml",
       "patterns": [
-        { "from": "__AUTHOR__", "to": "Darius" }
+        { "from": "__AUTHOR__", "to": "{{ author }}" }
       ]
     }
   ]
