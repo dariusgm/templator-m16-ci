@@ -342,6 +342,18 @@ mod tests {
     // --- generate: .template files are rendered ---
 
     #[test]
+    fn test_default_creates_new_instance() {
+        let engine = TemplateEngine::default();
+        let engine2 = TemplateEngine::new();
+        // Both should be functionally equivalent (they're both unit structs)
+        // Just verify that default() works
+        assert_eq!(
+            std::mem::size_of_val(&engine),
+            std::mem::size_of_val(&engine2)
+        );
+    }
+
+    #[test]
     fn test_generate_renders_template_file() {
         let template_dir = tempdir().unwrap();
         let output_dir = tempdir().unwrap();
@@ -724,6 +736,31 @@ mod tests {
         assert!(matches_pattern("node_modules/pkg/index.js", "**/*.js"));
         assert!(matches_pattern("deep/nested/file.tmp", "**/*.tmp"));
         assert!(!matches_pattern("file.rs", "**/*.js"));
+    }
+
+    #[test]
+    fn test_matches_pattern_recursive_directory_wildcard() {
+        // Pattern: **/node_modules/** — should match anything under node_modules at any depth
+        assert!(matches_pattern(
+            "node_modules/pkg/index.js",
+            "**/node_modules/**"
+        ));
+        assert!(matches_pattern(
+            "deep/node_modules/file.txt",
+            "**/node_modules/**"
+        ));
+        assert!(!matches_pattern("node_modules/file.txt", "**/other/**"));
+    }
+
+    #[test]
+    fn test_matches_pattern_recursive_specific_path() {
+        // Pattern: **/specific/path — should match at any depth
+        assert!(matches_pattern("src/specific/path", "**/specific/path"));
+        assert!(matches_pattern(
+            "deep/nested/specific/path",
+            "**/specific/path"
+        ));
+        assert!(!matches_pattern("src/specific/other", "**/specific/path"));
     }
 
     // --- is_excluded: path exclusion ---

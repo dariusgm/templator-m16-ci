@@ -26,6 +26,21 @@ cargo test          # unit tests (per module) + integration tests
 All tests live either in `#[cfg(test)]` blocks inside each source module or in
 `tests/integration_tests.rs`. Always run the full suite after changes.
 
+## Code Coverage
+
+```bash
+cargo install cargo-tarpaulin --locked
+cargo tarpaulin \
+  --out Stdout \
+  --timeout 300 \
+  --include-files src/config.rs src/engine.rs src/post_process.rs \
+  --ignore-panics \
+  --ignore-tests
+```
+
+CI requires minimum **95% coverage** on the three core modules above. Check coverage
+locally after significant changes to avoid CI failures.
+
 ## Project layout
 
 | File | Role |
