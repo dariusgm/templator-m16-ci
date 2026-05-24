@@ -2,8 +2,8 @@
   "name": "pre-processing-demo",
   "description": "Demonstrates pre_processing Exclude steps",
   "variables": {
-    "project_name": "my_app",
-    "author": "Alice"
+    "project_name": { "default": "my_app" },
+    "author": { "default": "Alice" }
   },
   "exclude": ["*.draft"],
   "pre_processing": [

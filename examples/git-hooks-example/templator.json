@@ -2,8 +2,8 @@
   "name": "rust-project-with-hooks",
   "description": "Rust project with pre-configured git hooks for code quality",
   "variables": {
-    "project_name": { "type": "string" },
-    "author": { "type": "string", "default": "Anonymous" }
+    "project_name": {},
+    "author": { "default": "Anonymous" }
   },
   "exclude": [
     ".git/objects/",

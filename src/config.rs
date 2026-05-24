@@ -4,13 +4,7 @@ use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct VariableDefinition {
-    #[serde(rename = "type", default = "default_variable_type")]
-    pub var_type: String,
     pub default: Option<String>,
-}
-
-fn default_variable_type() -> String {
-    "string".to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,16 +139,12 @@ mod tests {
         let json = r#"{
             "name": "my-template",
             "variables": {
-                "project_name": {"type": "string"},
-                "author": {"type": "string", "default": "Anonymous"}
+                "project_name": {},
+                "author": {"default": "Anonymous"}
             }
         }"#;
         let config: TemplateConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.variables.len(), 2);
-        assert_eq!(
-            config.variables["project_name"].var_type,
-            "string".to_string()
-        );
         assert!(config.variables["project_name"].default.is_none());
         assert_eq!(
             config.variables["author"].default.as_deref(),
@@ -163,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_variable_definition_defaults_type() {
+    fn test_parse_variable_definition_with_default() {
         let json = r#"{
             "name": "test",
             "variables": {
@@ -171,7 +161,7 @@ mod tests {
             }
         }"#;
         let config: TemplateConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.variables["name"].var_type, "string");
+        assert_eq!(config.variables["name"].default.as_deref(), Some("foo"));
     }
 
     #[test]
