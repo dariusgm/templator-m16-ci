@@ -94,6 +94,8 @@ impl TemplateEngine {
                     let rendered = tera::Tera::one_off(&content, &context, false)
                         .map_err(|e| anyhow::anyhow!("Render error in {:?}: {}", path, e))?;
                     std::fs::write(&output_path, rendered)?;
+                    let src_perms = std::fs::metadata(path)?.permissions();
+                    std::fs::set_permissions(&output_path, src_perms)?;
                     log::debug!("Rendered: {}", output_rel.display());
                 } else {
                     // Copy verbatim — no content substitution

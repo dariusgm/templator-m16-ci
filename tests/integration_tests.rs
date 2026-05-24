@@ -178,3 +178,52 @@ fn test_preserve_sections_pyproject_regeneration() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn test_generate_preserves_executable_bit_on_template_file() -> anyhow::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let template_dir = tempfile::tempdir()?;
+    let out = tempfile::tempdir()?;
+
+    // Executable .template file — goes through fs::write path
+    let src_template = template_dir.path().join("install.sh.template");
+    fs::write(&src_template, "#!/bin/sh\necho {{ name }}")?;
+    fs::set_permissions(&src_template, fs::Permissions::from_mode(0o755))?;
+
+    // Executable plain file — verifies existing fs::copy path is correct
+    let src_plain = template_dir.path().join("helper.sh");
+    fs::write(&src_plain, "#!/bin/sh\necho helper")?;
+    fs::set_permissions(&src_plain, fs::Permissions::from_mode(0o755))?;
+
+    let config = TemplateConfig {
+        name: "perm-test".into(),
+        description: None,
+        variables: std::collections::HashMap::new(),
+        exclude: vec![],
+        pre_processing: vec![],
+        post_processing: vec![],
+    };
+    let variables = std::collections::HashMap::from([("name".to_string(), "world".to_string())]);
+
+    TemplateEngine::new().generate(template_dir.path(), out.path(), &config, &variables)?;
+
+    let rendered = out.path().join("install.sh");
+    assert!(rendered.exists());
+    assert_eq!(
+        fs::metadata(&rendered)?.permissions().mode() & 0o111,
+        0o111,
+        "rendered template file must preserve executable bit"
+    );
+
+    let copied = out.path().join("helper.sh");
+    assert!(copied.exists());
+    assert_eq!(
+        fs::metadata(&copied)?.permissions().mode() & 0o111,
+        0o111,
+        "verbatim-copied file must preserve executable bit"
+    );
+
+    Ok(())
+}
