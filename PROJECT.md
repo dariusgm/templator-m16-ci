@@ -5,7 +5,7 @@
 | File | Purpose |
 |---|---|
 | `README.md` | User-facing documentation explaining how to install, use, and understand templator—the Jinja2-based template engine written in Rust. |
-| `CLAUDE.md` | Developer instructions for Claude Code, specifying mandatory `cargo fmt` and `cargo clippy` runs after Rust changes. |
+| `CLAUDE.md` | Developer instructions for Claude Code: mandatory `cargo fmt` and `cargo clippy` runs after Rust changes, `cargo test` for unit/integration tests, and `cargo-tarpaulin` for code coverage (95% minimum threshold). |
 | `LICENSE` | MIT license granting permission to use, modify, and distribute the software with attribution. |
 | `Cargo.toml` | Rust project manifest declaring dependencies (serde, tera, clap, walkdir), build targets, and release optimizations (LTO, stripping). |
 | `Cargo.lock` | Locked dependency versions ensuring reproducible builds across environments. |
@@ -18,7 +18,7 @@
 | `src/main.rs` | CLI entry point using clap to parse `--template`, `--config`, and `--output` arguments; orchestrates template generation and post-processing. |
 | `src/lib.rs` | Library root that exports the public API: `Config`, `TemplateEngine`, and `PostProcessor`. |
 | `src/config.rs` | Serde structs for deserializing `templator.json`: `Config` (name, variables, exclude, pre_processing, post_processing), `PreProcessStep` enum (Exclude), and `PostProcessStep` enum (Replace, PreserveSections). |
-| `src/engine.rs` | Core template processing: walks the template directory, applies `__var__` substitution to filenames, and renders `.template` files via Tera with variable context. |
+| `src/engine.rs` | Core template processing: walks the template directory, applies `__var__` substitution to filenames, renders `.template` files via Tera with variable context, and preserves source file permissions (including Unix executable bits) on output files. |
 | `src/pre_process.rs` | Pre-generation phase: `PreProcessor::effective_exclude` merges `config.exclude` with patterns from `pre_processing` Exclude steps to produce the list fed to the engine's path filter. |
 | `src/post_process.rs` | Post-generation steps: `replace` for literal string substitution and `preserve_sections` for section preservation, with path traversal and symlink escape protection. |
 
