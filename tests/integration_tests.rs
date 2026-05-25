@@ -201,7 +201,6 @@ fn test_generate_preserves_executable_bit_on_template_file() -> anyhow::Result<(
         name: "perm-test".into(),
         description: None,
         variables: std::collections::HashMap::new(),
-        exclude: vec![],
         pre_processing: vec![],
         post_processing: vec![],
     };

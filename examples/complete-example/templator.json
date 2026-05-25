@@ -7,20 +7,21 @@
     "python_version_short": { "default": "py312" },
     "author": { "default": "Anonymous" }
   },
-  "exclude": [
-    "*.draft",
-    "docs/private/",
-    ".git/HEAD",
-    ".git/config",
-    ".git/objects/",
-    ".git/refs/",
-    ".git/logs/",
-    ".git/description"
-  ],
   "pre_processing": [
     {
       "type": "exclude",
-      "patterns": ["*.log", "temp/"]
+      "patterns": [
+        "*.draft",
+        "docs/private/",
+        ".git/HEAD",
+        ".git/config",
+        ".git/objects/",
+        ".git/refs/",
+        ".git/logs/",
+        ".git/description",
+        "*.log",
+        "temp/"
+      ]
     }
   ],
   "post_processing": [

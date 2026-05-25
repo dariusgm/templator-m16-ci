@@ -32,9 +32,8 @@ impl TemplateEngine {
             context.insert(key, value);
         }
 
-        // Compute the effective exclude list by merging config.exclude with pre_processing patterns
-        let effective_exclude =
-            PreProcessor::new().effective_exclude(&config.exclude, &config.pre_processing);
+        // Compute the effective exclude list from pre_processing patterns
+        let effective_exclude = PreProcessor::new().effective_exclude(&config.pre_processing);
 
         for entry in WalkDir::new(template_dir).into_iter() {
             let entry = match entry {
@@ -217,6 +216,7 @@ fn matches_pattern(path: &str, pattern: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PreProcessStep;
     use std::fs;
     use tempfile::tempdir;
 
@@ -225,7 +225,6 @@ mod tests {
             name: "test".into(),
             description: None,
             variables: HashMap::new(),
-            exclude: vec![],
             pre_processing: vec![],
             post_processing: vec![],
         }
@@ -618,7 +617,9 @@ mod tests {
         fs::write(template_dir.path().join("README.md"), "hello").unwrap();
 
         let mut config = make_config();
-        config.exclude = vec![".git/".to_string()];
+        config.pre_processing = vec![PreProcessStep::Exclude {
+            patterns: vec![".git/".to_string()],
+        }];
         let vars = make_variables(&[]);
         TemplateEngine::new()
             .generate(template_dir.path(), output_dir.path(), &config, &vars)
@@ -803,7 +804,9 @@ mod tests {
 
         let mut config = make_config();
         let vars = make_variables(&[]);
-        config.exclude = vec!["*.tmp".to_string()];
+        config.pre_processing = vec![PreProcessStep::Exclude {
+            patterns: vec!["*.tmp".to_string()],
+        }];
 
         TemplateEngine::new()
             .generate(template_dir.path(), output_dir.path(), &config, &vars)
@@ -832,7 +835,9 @@ mod tests {
 
         let mut config = make_config();
         let vars = make_variables(&[]);
-        config.exclude = vec!["build/".to_string()];
+        config.pre_processing = vec![PreProcessStep::Exclude {
+            patterns: vec!["build/".to_string()],
+        }];
 
         TemplateEngine::new()
             .generate(template_dir.path(), output_dir.path(), &config, &vars)
@@ -866,7 +871,9 @@ mod tests {
 
         let mut config = make_config();
         let vars = make_variables(&[]);
-        config.exclude = vec!["node_modules/".to_string()];
+        config.pre_processing = vec![PreProcessStep::Exclude {
+            patterns: vec!["node_modules/".to_string()],
+        }];
 
         TemplateEngine::new()
             .generate(template_dir.path(), output_dir.path(), &config, &vars)
@@ -900,7 +907,9 @@ mod tests {
 
         let mut config = make_config();
         let vars = make_variables(&[("value", "test")]);
-        config.exclude = vec!["config.template".to_string()];
+        config.pre_processing = vec![PreProcessStep::Exclude {
+            patterns: vec!["config.template".to_string()],
+        }];
 
         TemplateEngine::new()
             .generate(template_dir.path(), output_dir.path(), &config, &vars)

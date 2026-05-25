@@ -13,8 +13,6 @@ pub struct TemplateConfig {
     pub description: Option<String>,
     pub variables: HashMap<String, VariableDefinition>,
     #[serde(default)]
-    pub exclude: Vec<String>,
-    #[serde(default)]
     pub pre_processing: Vec<PreProcessStep>,
     #[serde(default)]
     pub post_processing: Vec<PostProcessStep>,
@@ -197,20 +195,6 @@ mod tests {
         .unwrap();
         let config = TemplateConfig::load_from_template_dir(temp_dir.path()).unwrap();
         assert_eq!(config.name, "x");
-    }
-
-    #[test]
-    fn test_parse_exclude_patterns() {
-        let json = r#"{
-            "name": "test",
-            "variables": {},
-            "exclude": ["*.tmp", "build/", "node_modules/**"]
-        }"#;
-        let config: TemplateConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.exclude.len(), 3);
-        assert_eq!(config.exclude[0], "*.tmp");
-        assert_eq!(config.exclude[1], "build/");
-        assert_eq!(config.exclude[2], "node_modules/**");
     }
 
     #[test]
