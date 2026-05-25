@@ -39,82 +39,24 @@
 
 | File | Purpose |
 |---|---|
-| `examples/README.md` | Comprehensive guide to all examples with instructions for running each one and explanation of post-processing types. |
+| `examples/README.md` | Guide to the complete example and reference documentation for all templator features. |
 
-### `basic-template` — Replace Post-Processing
+### `complete-example` — All Features
 
-Demonstrates the `replace` post-processing step for literal string substitution.
-
-| File | Purpose |
-|---|---|
-| `examples/basic-template/templator.json` | Config with `replace` step that substitutes `__AUTHOR__` with "Darius" in `pyproject.toml`. |
-| `examples/basic-template/template/` | Python project template with variable substitution and static files. |
-| `examples/basic-template/template/pyproject.toml.template` | Tera template for Python metadata; author placeholder replaced via post-processing. |
-| `examples/basic-template/template/src/__project_name__/main.py.template` | Nested template file demonstrating `__var__` directory renaming and Tera variable injection. |
-| `examples/basic-template/template/.gitignore` | Static file copied verbatim; not rendered. |
-
-### `full-featured-example` — Multiple Post-Processing Steps
-
-Demonstrates combining multiple post-processing steps in a single template.
+Demonstrates **all** templator features (variable substitution, Tera rendering, static files, `exclude`, `pre_processing`, `replace`, `preserve_sections`, and git hooks) in a single Python project template.
 
 | File | Purpose |
 |---|---|
-| `examples/full-featured-example/templator.json` | Config with two `replace` steps (version, author, copyright year). |
-| `examples/full-featured-example/template/Cargo.toml.template` | Rust manifest template with version and author placeholders for post-processing substitution. |
-| `examples/full-featured-example/template/src/lib/mod.rs.template` | Rust library module with copyright year placeholder for post-processing substitution. |
-| `examples/full-featured-example/template/README.md.template` | Documentation template with project name and description variables. |
-| `examples/full-featured-example/template/build.sh` | Shell script template for the Rust project. |
-
-### `exclude-example` — File Exclusion
-
-Demonstrates the `exclude` feature to prevent certain files from being copied to output.
-
-| File | Purpose |
-|---|---|
-| `examples/exclude-example/templator.json` | Config with `exclude` patterns for drafts, private docs, build artifacts, and temp files. |
-| `examples/exclude-example/template/README.md.template` | Template documenting which files are included vs. excluded. |
-| `examples/exclude-example/template/src/main.rs` | Source file that is **included** in output. |
-| `examples/exclude-example/template/src/main.rs.draft` | Draft version matching `*.draft` pattern; **excluded** from output. |
-| `examples/exclude-example/template/docs/guide.md` | Public documentation that is **included** in output. |
-| `examples/exclude-example/template/docs/private/notes.md` | Private notes in `docs/private/` directory; **excluded** from output. |
-| `examples/exclude-example/template/.env.example` | Example env file excluded by exact name match. |
-| `examples/exclude-example/template/build/artifact.o` | Build output in `build/` directory; **excluded** from output. |
-| `examples/exclude-example/template/temp/cache.tmp` | Temporary file matching `**/*.tmp` pattern; **excluded** from output. |
-
-### `git-hooks-example` — Git Hooks with Selective `.git/` Inclusion
-
-Demonstrates including `.git/hooks/` scripts while excluding the rest of the `.git/` directory using selective exclude patterns. Useful for templates that want to provision git hooks (e.g., pre-commit checks) in generated projects.
-
-| File | Purpose |
-|---|---|
-| `examples/git-hooks-example/templator.json` | Config with exclude patterns that keep only `.git/hooks/` (no objects, refs, config, etc.). |
-| `examples/git-hooks-example/template/.git/hooks/pre-commit` | Executable hook that runs `cargo fmt --check` before each commit. |
-| `examples/git-hooks-example/template/.git/hooks/prepare-commit-msg` | Optional hook with example code for prepending issue numbers to commits. |
-| `examples/git-hooks-example/template/README.md.template` | Documentation explaining the included hooks and how to customize them. |
-| `examples/git-hooks-example/template/src/main.rs.template` | Sample Rust source file with author and project name placeholders. |
-| `examples/git-hooks-example/template/.gitignore` | Standard Rust `.gitignore` file. |
-
-### `pre-processing-example` — Pre-Processing Exclusion
-
-Demonstrates using `pre_processing` Exclude steps alongside `config.exclude` to show that both mechanisms are additive.
-
-| File | Purpose |
-|---|---|
-| `examples/pre-processing-example/templator.json` | Config with both `exclude` and `pre_processing` Exclude patterns. |
-| `examples/pre-processing-example/template/README.md.template` | Template file included in output. |
-| `examples/pre-processing-example/template/src/__project_name__/main.py.template` | Nested template demonstrating variable-based directory renaming. |
-| `examples/pre-processing-example/template/docs/guide.md` | Static file included verbatim. |
-| `examples/pre-processing-example/template/docs/internal/architecture.md` | Internal doc excluded by pre_processing Exclude (docs/internal/). |
-| `examples/pre-processing-example/template/temp/scratch.txt` | Temp file excluded by pre_processing Exclude (temp/). |
-| `examples/pre-processing-example/template/debug.log` | Log file excluded by pre_processing Exclude (*.log). |
-| `examples/pre-processing-example/template/main.py.draft` | Draft file excluded by config.exclude (*.draft). |
-
-### `preserve-sections-example` — Preserve Sections Across Regenerations
-
-Demonstrates the `preserve_sections` post-processing step for protecting user-edited sections when templates are regenerated. Supports marking sections with begin/end markers so user content survives template updates.
-
-| File | Purpose |
-|---|---|
-| `examples/preserve-sections-example/templator.json` | Config with `preserve_sections` step targeting `pyproject.toml` with `# [preserve:begin]` and `# [preserve:end]` markers. |
-| `examples/preserve-sections-example/template/pyproject.toml.template` | Python project metadata template with user-controlled section marked between begin/end markers for custom dependencies or settings. |
-| `examples/preserve-sections-example-answers.json` | Example answers file with project name, Python version, and author. |
+| `examples/complete-example/templator.json` | Config with all feature types: top-level `exclude`, `pre_processing` exclude, `replace` post-processing, and `preserve_sections` post-processing. |
+| `examples/complete-example/template/` | Python project template demonstrating all features. |
+| `examples/complete-example/template/pyproject.toml.template` | Tera template with `__COPYRIGHT_YEAR__` literal placeholder for `replace` post-processing, and `preserve_sections` markers for user-edited dependencies. |
+| `examples/complete-example/template/README.md.template` | Tera rendering with full feature documentation. |
+| `examples/complete-example/template/src/__project_name__/main.py.template` | Demonstrates filename variable substitution (`__project_name__` → project name). |
+| `examples/complete-example/template/.gitignore` | Static file copied verbatim; not rendered. |
+| `examples/complete-example/template/docs/guide.md` | Public docs included in output. |
+| `examples/complete-example/template/docs/private/notes.md` | Private docs excluded by top-level `exclude` pattern `docs/private/`. |
+| `examples/complete-example/template/.git/hooks/pre-commit` | Executable git hook; `.git/` directory is partially included via selective exclude patterns. |
+| `examples/complete-example/template/main.py.draft` | Draft file excluded by top-level `exclude` pattern `*.draft`. |
+| `examples/complete-example/template/temp/scratch.txt` | Temporary file excluded by `pre_processing` exclude pattern `temp/`. |
+| `examples/complete-example/template/debug.log` | Log file excluded by `pre_processing` exclude pattern `*.log`. |
+| `examples/complete-example-answers.json` | Example answers file with project name, Python version, and author. |

@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use templator::{PostProcessor, ProjectAnswers, SavedAnswers, TemplateConfig, TemplateEngine};
 
 fn basic_template_package() -> PathBuf {
-    PathBuf::from("examples/basic-template")
+    PathBuf::from("examples/complete-example")
 }
 
 fn basic_answers_file() -> PathBuf {
-    PathBuf::from("examples/basic-answers.json")
+    PathBuf::from("examples/complete-example-answers.json")
 }
 
 #[test]
@@ -78,8 +78,8 @@ fn test_post_processing_and_saved_answers() -> anyhow::Result<()> {
 
 #[test]
 fn test_preserve_sections_pyproject_regeneration() -> anyhow::Result<()> {
-    let template_pkg = PathBuf::from("examples/preserve-sections-example");
-    let answers_file = PathBuf::from("examples/preserve-sections-example-answers.json");
+    let template_pkg = PathBuf::from("examples/complete-example");
+    let answers_file = PathBuf::from("examples/complete-example-answers.json");
 
     let config = TemplateConfig::load_from_template_dir(&template_pkg)?;
     let answers = ProjectAnswers::load_from_file(&answers_file)?;
@@ -96,8 +96,8 @@ fn test_preserve_sections_pyproject_regeneration() -> anyhow::Result<()> {
 
     let generated = fs::read_to_string(out.path().join("pyproject.toml"))?;
     assert!(
-        generated.contains("my_app"),
-        "Expected 'my_app' in generated pyproject.toml"
+        generated.contains("my_project"),
+        "Expected 'my_project' in generated pyproject.toml"
     );
     assert!(
         generated.contains("# [preserve:begin]"),
