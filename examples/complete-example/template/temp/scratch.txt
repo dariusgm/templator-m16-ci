@@ -1,0 +1,2 @@
+Temporary scratch file.
+This file matches the pre_processing exclude pattern "temp/" and is EXCLUDED from output.

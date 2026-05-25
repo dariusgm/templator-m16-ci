@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""{{ project_name }} — A template-generated Python project."""
+
+__version__ = "0.1.0"
+__author__ = "{{ author }}"
+
+
+def main():
+    """Entry point for {{ project_name }}."""
+    print(f"Hello from {__name__}!")
+    print(f"Author: {__author__}")
+    print(f"Version: {__version__}")
+
+
+if __name__ == "__main__":
+    main()

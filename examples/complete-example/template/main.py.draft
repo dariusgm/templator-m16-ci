@@ -1,0 +1,5 @@
+# Draft version of main.py
+# This file matches the *.draft pattern and is EXCLUDED from output
+
+def main():
+    print("This is a draft, it won't be in the generated output")

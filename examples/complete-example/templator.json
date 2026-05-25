@@ -1,0 +1,41 @@
+{
+  "name": "complete-python-project",
+  "description": "A comprehensive Python project template demonstrating all templator features",
+  "variables": {
+    "project_name": {},
+    "python_version": { "default": "3.12" },
+    "python_version_short": { "default": "py312" },
+    "author": { "default": "Anonymous" }
+  },
+  "exclude": [
+    "*.draft",
+    "docs/private/",
+    ".git/HEAD",
+    ".git/config",
+    ".git/objects/",
+    ".git/refs/",
+    ".git/logs/",
+    ".git/description"
+  ],
+  "pre_processing": [
+    {
+      "type": "exclude",
+      "patterns": ["*.log", "temp/"]
+    }
+  ],
+  "post_processing": [
+    {
+      "type": "replace",
+      "file": "pyproject.toml",
+      "patterns": [
+        { "from": "__COPYRIGHT_YEAR__", "to": "2026" }
+      ]
+    },
+    {
+      "type": "preserve_sections",
+      "file": "pyproject.toml",
+      "begin_marker": "# [preserve:begin]",
+      "end_marker": "# [preserve:end]"
+    }
+  ]
+}

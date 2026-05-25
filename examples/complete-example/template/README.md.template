@@ -1,0 +1,79 @@
+# {{ project_name }}
+
+{{ description | default(value="A Python project") }}
+
+**Author:** {{ author }}
+**Python Version:** {{ python_version }}
+
+## Generated from Complete Example Template
+
+This project demonstrates all templator features:
+
+- **Variable substitution in filenames** — the `src/__project_name__/` directory is renamed to `src/{{ project_name }}/`
+- **Tera template rendering** — this README and `main.py` contain Jinja2/Tera syntax rendered at generation time
+- **Static files** — the `.gitignore` file is copied verbatim without processing
+- **Post-processing with `replace`** — the copyright year in `pyproject.toml` is substituted after generation
+- **Preserve sections** — the `[project.optional-dependencies]` section in `pyproject.toml` preserves user edits across regenerations
+- **File exclusion** — draft files, private docs, temp files, and parts of the `.git/` directory are excluded
+- **Git hooks** — pre-configured hooks in `.git/hooks/` are included and executable
+- **Pre-processing exclusion** — patterns in `pre_processing` exclude additional files beyond `exclude`
+
+## Included Files
+
+- `src/{{ project_name }}/main.py` — main entry point (from `src/__project_name__/main.py.template`)
+- `README.md` — this file (from `README.md.template`)
+- `pyproject.toml` — Python metadata (from `pyproject.toml.template`)
+- `.gitignore` — static git ignore rules
+- `docs/guide.md` — public documentation
+- `.git/hooks/pre-commit` — executable pre-commit hook
+
+## Excluded Files
+
+The following files from the template are excluded from the generated output:
+
+- `*.draft` — Draft files (matches `main.py.draft`)
+- `docs/private/` — Private documentation directory (matches `docs/private/notes.md`)
+- `temp/` — Temporary files (matches `temp/scratch.txt`)
+- `*.log` — Debug logs (matches `debug.log`)
+- `.git/config`, `.git/HEAD`, `.git/objects/`, `.git/refs/`, `.git/logs/`, `.git/description` — Git internals
+
+## Project Structure
+
+After generation, your project will have:
+
+```
+{{ project_name }}/
+├── src/
+│   └── {{ project_name }}/
+│       └── main.py
+├── docs/
+│   └── guide.md
+├── .git/
+│   └── hooks/
+│       └── pre-commit
+├── .gitignore
+├── pyproject.toml
+└── README.md
+```
+
+## Building and Running
+
+```bash
+# Install dependencies
+pip install -e .
+
+# Run the project
+python -m {{ project_name }}.main
+```
+
+## Features of This Template
+
+1. **Filename Variable Substitution** — Any directory or file named `__variable__` gets replaced with the variable value
+2. **Tera Rendering** — Files ending in `.template` are rendered with Jinja2/Tera syntax
+3. **Non-Template Files** — Files without `.template` suffix are copied verbatim (like `.gitignore`)
+4. **Post-Processing** — After generation, literal placeholders (like `__COPYRIGHT_YEAR__`) can be replaced
+5. **Preserve Sections** — Mark sections with begin/end markers to keep user edits through regenerations
+6. **File Exclusion** — Use glob patterns to exclude files from the output
+7. **Git Hooks** — The pre-commit hook runs `python -m py_compile` on Python files to catch syntax errors
+
+Learn more at: https://github.com/anthropics/templator

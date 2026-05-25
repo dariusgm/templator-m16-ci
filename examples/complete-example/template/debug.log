@@ -1,0 +1,5 @@
+DEBUG: Application startup
+DEBUG: Loading configuration
+DEBUG: This is a debug log file
+
+This file matches the pre_processing exclude pattern "*.log" and is EXCLUDED from output.

@@ -1,0 +1,19 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = "A Python project generated from the complete-example template"
+authors = [{ name = "{{ author }}" }]
+requires-python = ">={{ python_version }}"
+
+[project.optional-dependencies]
+# [preserve:begin]
+# [preserve:end]
+
+[tool.ruff]
+target-version = "{{ python_version_short }}"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+# Copyright (c) __COPYRIGHT_YEAR__ {{ author }}
