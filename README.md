@@ -13,13 +13,13 @@ cargo install --path .
 ```bash
 templator \
   --template path/to/template \
-  --config   path/to/templator.json \
+  --answers  path/to/answers.json \
   --output   path/to/output
 
 # Flags
-#   -t, --template   Template directory
-#   -c, --config     JSON config file (templator.json)
-#   -o, --output     Output directory (created if it does not exist)
+#   --template   Template directory (must contain templator.json)
+#   --answers    JSON file with variable values
+#   --output     Output directory (created if it does not exist)
 #   -v, --verbose    Enable debug logging
 ```
 
@@ -58,24 +58,11 @@ Variables defined in `variables` override the top-level `name` and `description`
 
 Full Tera syntax is available: filters (`{{ value \| upper }}`), conditionals (`{% if … %}`), loops (`{% for … %}`), and the `default` filter (`{{ optional \| default(value="fallback") }}`).
 
-### File exclusion
-
-Files and directories can be excluded from the output using glob patterns in the `exclude` array:
-
-| Pattern | Matches | Example |
-|---|---|---|
-| `*.ext` | Files with specific extension | `*.tmp`, `*.draft` |
-| `filename` | Exact filename | `.env.example` |
-| `dir/` | Entire directory (requires trailing `/`) | `build/`, `node_modules/` |
-| `**/*.ext` | Files at any depth | `**/*.log` matches `src/logs/debug.log` |
-
-Excluded files are not copied to the output directory, allowing you to keep sensitive files, build artifacts, and temporary files in the template while generating clean projects.
-
 ### Pre-processing
 
 `pre_processing` steps run before the engine walks the template directory. Currently, only the `exclude` step type is supported.
 
-#### `exclude` — additional glob patterns
+#### `exclude` — glob patterns
 
 ```json
 "pre_processing": [
@@ -86,19 +73,11 @@ Excluded files are not copied to the output directory, allowing you to keep sens
 ]
 ```
 
-Patterns are merged with any patterns already listed in the top-level `exclude` array.
-Both are additive: a file is excluded if it matches any pattern from either source.
-
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `type` | string | yes | Must be `"exclude"` |
 | `patterns` | array of strings | yes | Glob patterns using the same syntax as `exclude` |
 
-**Why use `pre_processing.exclude` instead of `exclude`?**
-- Organisational: group exclusions that belong together (e.g., all CI artifacts in one step, all draft files in another).
-- Future-proofing: additional `pre_processing` step types will run in the same phase, letting you express more complex setup logic.
-
-Both mechanisms co-exist. You can use one, the other, or both simultaneously.
 
 ## Config file (`templator.json`)
 
@@ -112,9 +91,11 @@ Both mechanisms co-exist. You can use one, the other, or both simultaneously.
     "python_version_short": "py312",
     "author": "Darius"
   },
-  "exclude": [
-    "*.draft",
-    ".env.example"
+  "pre_processing": [
+    {
+      "type": "exclude",
+      "patterns": ["*.draft", ".env.example"]
+    }
   ],
   "post_processing": [
     {
@@ -133,7 +114,6 @@ Both mechanisms co-exist. You can use one, the other, or both simultaneously.
 | `name` | string | yes | Project name (available as `{{ name }}` in templates) |
 | `description` | string | no | Available as `{{ description }}` in templates |
 | `variables` | object | yes | Key/value pairs injected into the Tera context |
-| `exclude` | array | no | Glob patterns for files/directories to exclude from output |
 | `pre_processing` | array | no | Steps to run before file generation |
 | `post_processing` | array | no | Steps to run after file generation |
 
@@ -143,7 +123,7 @@ Both mechanisms co-exist. You can use one, the other, or both simultaneously.
 
 Pre-processing runs **before** the template engine walks the template directory. Currently supports file exclusion patterns.
 
-#### `exclude` — Additional exclusion patterns
+#### `exclude` — Exclusion patterns
 
 ```json
 "pre_processing": [
@@ -154,12 +134,12 @@ Pre-processing runs **before** the template engine walks the template directory.
 ]
 ```
 
-Merges with `exclude` array patterns (both are additive). Use to organize exclusions logically or prepare complex filtering logic.
+Use to exclude files and directories from template generation. Multiple exclusion steps are additive (a file is excluded if it matches ANY pattern).
 
 | Field | Type | Description |
 |---|---|---|
 | `type` | string | Must be `"exclude"` |
-| `patterns` | array | Glob patterns using same syntax as top-level `exclude` |
+| `patterns` | array | Glob patterns using the same syntax documented in Exclusion Patterns |
 
 ---
 
@@ -262,7 +242,7 @@ pydantic = ">=2.0"
 
 ### Exclusion Patterns
 
-Available in both `exclude` array and `pre_processing.exclude` steps.
+Used in `pre_processing` steps with type `"exclude"`.
 
 | Pattern | Matches | Examples |
 |---|---|---|
@@ -276,7 +256,7 @@ Available in both `exclude` array and `pre_processing.exclude` steps.
 - Paths normalized to forward slashes (cross-platform compatible)
 - `**` matches zero or more path components
 - `*` matches any characters within a single path component
-- Both `exclude` and `pre_processing.exclude` are additive (file excluded if it matches ANY pattern)
+- Multiple exclusion steps are additive (file excluded if it matches ANY pattern)
 
 ### Pre-Processing Features
 
@@ -284,11 +264,9 @@ Run before template generation. Organize and filter which files the engine sees.
 
 | Feature | Scope | Syntax | Use Case |
 |---|---|---|---|
-| **exclude** | Top-level array | `"exclude": ["*.tmp", "build/"]` | Quick, flat list of patterns |
-| **pre_processing.exclude** | Step array | `{ "type": "exclude", "patterns": [...] }` | Logical grouping; future extension point |
+| **exclude** | Step array | `{ "type": "exclude", "patterns": [...] }` | Glob patterns to skip during template generation |
 
 **Constraints:**
-- Patterns from both sources are merged additively
 - No way to un-exclude a file once excluded
 - Exclusions happen before the engine walks the template
 
@@ -334,7 +312,7 @@ Run after template generation. Modify generated files, preserve user edits, or a
 
 ```
 examples/basic-template/
-├── templator.json
+├── templator.json                  ← config file (auto-loaded)
 └── template/
     ├── pyproject.toml.template     ← content rendered via Tera
     ├── .gitignore                  ← copied verbatim
@@ -343,12 +321,24 @@ examples/basic-template/
             └── main.py.template    ← content rendered via Tera
 ```
 
-Running against this example:
+With an answers file (answers.json):
+
+```json
+{
+  "variables": {
+    "project_name": "my_project",
+    "python_version": "3.12",
+    "author": "Alice"
+  }
+}
+```
+
+Running templator:
 
 ```bash
 templator \
-  --template examples/basic-template/template \
-  --config   examples/basic-template/templator.json \
+  --template examples/basic-template \
+  --answers  answers.json \
   --output   /tmp/my-project
 ```
 

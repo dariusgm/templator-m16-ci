@@ -22,8 +22,8 @@ The `complete-example/` directory demonstrates **all** features of templator in 
 ```bash
 # Generate the project
 cargo run -- \
-  --template examples/complete-example/template \
-  --config examples/complete-example-answers.json \
+  --template examples/complete-example \
+  --answers examples/complete-example-answers.json \
   --output /tmp/my-generated-project
 
 # Examine the output
@@ -109,19 +109,6 @@ Markers in template:
 
 ## Reference: Exclusion Patterns
 
-### Top-level `exclude`
-
-```json
-{
-  "exclude": [
-    "*.draft",           // All .draft files
-    "docs/private/",     // Directory and all contents
-    "build/",            // Another directory
-    "**/*.tmp",          // All .tmp files at any depth
-    ".git/config"        // Exact file match
-  ]
-}
-```
 
 Pattern syntax:
 - `*.ext` — files ending with `.ext` in any directory
@@ -130,9 +117,6 @@ Pattern syntax:
 - `exact/path/file` — exact path match
 - `**/dir/**` — any depth to `dir/`, then any depth within
 
-### Pre-processing `exclude`
-
-In addition to top-level `exclude`, add exclude patterns via `pre_processing`:
 
 ```json
 {
@@ -144,9 +128,6 @@ In addition to top-level `exclude`, add exclude patterns via `pre_processing`:
   ]
 }
 ```
-
-These patterns are **merged** with top-level `exclude` — both apply.
-
 ---
 
 ## How Variables Work

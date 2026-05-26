@@ -29,6 +29,32 @@ jobs:
       - name: Tests
         run: cargo test --verbose
 
+      - name: Test example execution
+        run: |
+          # Create answers file
+          mkdir -p /tmp/templator-test
+          cat > /tmp/templator-test/answers.json << 'EOF'
+          {
+            "variables": {
+              "project_name": "test_project",
+              "python_version": "3.12",
+              "python_version_short": "py312",
+              "author": "Test User"
+            }
+          }
+          EOF
+
+          # Run templator with example
+          cargo run --release -- \
+            --template examples/complete-example \
+            --answers /tmp/templator-test/answers.json \
+            --output /tmp/templator-test/output
+
+          # Verify output was created
+          test -d /tmp/templator-test/output || exit 1
+          test -f /tmp/templator-test/output/pyproject.toml || exit 1
+          test -d /tmp/templator-test/output/src/test_project || exit 1
+
       # Code coverage with tarpaulin — minimum 95% required
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin --locked
