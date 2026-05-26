@@ -78,9 +78,17 @@ impl PostProcessor {
         }
         let path = self.working_dir.join(file);
         let canonical_working_dir = self.working_dir.canonicalize()?;
-        let canonical_path = path
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Cannot read '{}': {}", file, e))?;
+        let canonical_path = match path.canonicalize() {
+            Ok(p) => p,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                log::debug!(
+                    "preserve_sections: target '{}' was not generated, skipping",
+                    file
+                );
+                return Ok(());
+            }
+            Err(e) => return Err(anyhow::anyhow!("Cannot access '{}': {}", file, e)),
+        };
         if !canonical_path.starts_with(&canonical_working_dir) {
             anyhow::bail!(
                 "preserve_sections path '{}' resolves outside output directory",
@@ -397,6 +405,69 @@ mod tests {
         assert_eq!(
             fs::read_to_string(dir.path().join("f.txt")).unwrap(),
             "new\n# BEGIN\nuser\n# END\nnew2"
+        );
+    }
+
+    #[test]
+    fn test_preserve_sections_target_missing_is_noop() {
+        use crate::config::PostProcessStep;
+        let dir = tempdir().unwrap();
+        // No file is created — target was never generated.
+        // Simulate having captured sections from a previous run.
+        let mut proc = processor(dir.path());
+        proc.preserved_sections
+            .insert("missing.txt".into(), vec!["user content\n".into()]);
+
+        let result = proc.execute(&[PostProcessStep::PreserveSections {
+            file: "missing.txt".into(),
+            begin_marker: "# BEGIN\n".into(),
+            end_marker: "# END\n".into(),
+        }]);
+        assert!(
+            result.is_ok(),
+            "missing target should be a no-op, not an error"
+        );
+        assert!(
+            !dir.path().join("missing.txt").exists(),
+            "preserve_sections must not create the target file"
+        );
+    }
+
+    #[test]
+    fn test_preserve_sections_no_source_no_target_is_noop() {
+        use crate::config::PostProcessStep;
+        let dir = tempdir().unwrap();
+        // Neither a prior snapshot nor a generated target file exist.
+        let proc = processor(dir.path());
+        let result = proc.execute(&[PostProcessStep::PreserveSections {
+            file: "missing.txt".into(),
+            begin_marker: "# BEGIN\n".into(),
+            end_marker: "# END\n".into(),
+        }]);
+        assert!(
+            result.is_ok(),
+            "missing target should be a no-op, not an error"
+        );
+        assert!(
+            !dir.path().join("missing.txt").exists(),
+            "preserve_sections must not create the target file"
+        );
+    }
+
+    #[test]
+    fn test_snapshot_missing_source_is_silent_noop() {
+        use crate::config::PostProcessStep;
+        let dir = tempdir().unwrap();
+        // Source file does not exist — snapshot should not panic or insert anything.
+        let mut proc = processor(dir.path());
+        proc.snapshot_preserved_sections(&[PostProcessStep::PreserveSections {
+            file: "nonexistent.txt".into(),
+            begin_marker: "# BEGIN\n".into(),
+            end_marker: "# END\n".into(),
+        }]);
+        assert!(
+            proc.preserved_sections.is_empty(),
+            "no sections should be captured when source file is absent"
         );
     }
 
